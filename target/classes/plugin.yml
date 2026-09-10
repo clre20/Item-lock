@@ -5,6 +5,7 @@ main: clre20.itemLock.ItemLock
 api-version: '1.21'
 load: POSTWORLD
 authors: [ Clre20 ]
+softdepend: [ Shopkeepers ]
 
 commands:
   itemlock:

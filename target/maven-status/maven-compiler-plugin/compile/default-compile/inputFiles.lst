@@ -1,5 +1,8 @@
 C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\command\ItemLockCommand.java
 C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\command\ItemLockTabCompleter.java
+C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\compatibility\shopkeepers\NoOpShopkeepersHook.java
+C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\compatibility\shopkeepers\ShopkeepersHook.java
+C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\compatibility\shopkeepers\ShopkeepersHookImpl.java
 C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\config\PluginConfig.java
 C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\feedback\FeedbackService.java
 C:\Drive\Code\MC_Plugin\Item-lock\src\main\java\clre20\itemLock\ItemLock.java

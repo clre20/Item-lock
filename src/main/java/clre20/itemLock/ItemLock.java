@@ -2,6 +2,7 @@ package clre20.itemLock;
 
 import clre20.itemLock.command.ItemLockCommand;
 import clre20.itemLock.command.ItemLockTabCompleter;
+import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.feedback.FeedbackService;
 import clre20.itemLock.listener.AutomationSecurityListener;
@@ -26,6 +27,7 @@ public final class ItemLock extends JavaPlugin {
     private TemplateManager templateManager;
     private ItemMatcher itemMatcher;
     private FeedbackService feedbackService;
+    private ShopkeepersHook shopkeepersHook;
 
     public static ItemLock getInstance() {
         return instance;
@@ -44,14 +46,20 @@ public final class ItemLock extends JavaPlugin {
         this.itemMatcher = new ItemMatcher(this.templateManager);
         this.feedbackService = new FeedbackService(this, this.pluginConfig);
 
-        // 3. 註冊安全監聽器
+        // 3. 初始化第三方插件相容 Hook (Shopkeepers)
+        this.shopkeepersHook = ShopkeepersHook.create();
+        if (this.shopkeepersHook.isAvailable()) {
+            getLogger().info("已檢測到並成功掛接 Shopkeepers 插件！已啟用交易與編輯介面相容支援。");
+        }
+
+        // 4. 註冊安全監聽器
         PluginManager pm = getServer().getPluginManager();
-        pm.registerEvents(new InventorySecurityListener(this.itemMatcher, this.feedbackService), this);
+        pm.registerEvents(new InventorySecurityListener(this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook), this);
         pm.registerEvents(new CraftingSecurityListener(this.itemMatcher, this.feedbackService), this);
         pm.registerEvents(new AutomationSecurityListener(this.pluginConfig, this.itemMatcher), this);
-        pm.registerEvents(new WorldInteractionListener(this, this.pluginConfig, this.itemMatcher, this.feedbackService), this);
+        pm.registerEvents(new WorldInteractionListener(this, this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook), this);
 
-        // 4. 註冊指令與智慧補全
+        // 5. 註冊指令與智慧補全
         PluginCommand command = getCommand("itemlock");
         if (command != null) {
             command.setExecutor(new ItemLockCommand(this.pluginConfig, this.templateManager, this.itemMatcher));
@@ -83,5 +91,9 @@ public final class ItemLock extends JavaPlugin {
 
     public FeedbackService getFeedbackService() {
         return feedbackService;
+    }
+
+    public ShopkeepersHook getShopkeepersHook() {
+        return shopkeepersHook;
     }
 }

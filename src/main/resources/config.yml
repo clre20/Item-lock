@@ -18,8 +18,16 @@ hopper:
 
 # 掉落實體安全防護
 drop-protection:
-  # 掉落物是否防止自然消失
+  # 掉落物是否防止自然消失 (false: 5分鐘後正常消失防卡頓; true: 永遠不消失，預設 false)
   prevent-despawn: false
+
+# 第三方外掛相容設定
+compatibility:
+  shopkeepers:
+    # 是否允許在 Shopkeepers 交易介面使用受保護物品 (作為交易貨幣或換取獲得，預設 true)
+    allow-trading: true
+    # 是否允許在 Shopkeepers 設定/編輯介面 (Editor) 設定受保護物品 (預設 true)
+    allow-editor: true
 
 # 反饋與體驗設定
 feedback:

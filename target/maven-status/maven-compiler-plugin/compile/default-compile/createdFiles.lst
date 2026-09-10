@@ -1,4 +1,5 @@
 clre20\itemLock\listener\WorldInteractionListener.class
+clre20\itemLock\compatibility\shopkeepers\NoOpShopkeepersHook.class
 clre20\itemLock\feedback\FeedbackService.class
 clre20\itemLock\matcher\ItemMatcher.class
 clre20\itemLock\template\TemplateManager.class
@@ -9,6 +10,8 @@ clre20\itemLock\listener\CraftingSecurityListener.class
 clre20\itemLock\matcher\MatchResult.class
 clre20\itemLock\listener\AutomationSecurityListener.class
 clre20\itemLock\command\ItemLockTabCompleter.class
+clre20\itemLock\compatibility\shopkeepers\ShopkeepersHook.class
+clre20\itemLock\compatibility\shopkeepers\ShopkeepersHookImpl.class
 clre20\itemLock\command\ItemLockCommand.class
 clre20\itemLock\security\ContainerWhitelist.class
 clre20\itemLock\config\PluginConfig.class

@@ -28,6 +28,9 @@ public class PluginConfig {
 
     private boolean preventDespawn;
 
+    private boolean allowShopkeepersTrading;
+    private boolean allowShopkeepersEditor;
+
     private boolean actionbarEnabled;
     private String actionbarMessage;
 
@@ -78,6 +81,9 @@ public class PluginConfig {
         this.allowHopperPickup = config.getBoolean("hopper.allow-pickup", false);
 
         this.preventDespawn = config.getBoolean("drop-protection.prevent-despawn", false);
+
+        this.allowShopkeepersTrading = config.getBoolean("compatibility.shopkeepers.allow-trading", true);
+        this.allowShopkeepersEditor = config.getBoolean("compatibility.shopkeepers.allow-editor", true);
 
         this.actionbarEnabled = config.getBoolean("feedback.actionbar.enabled", true);
         this.actionbarMessage = config.getString("feedback.actionbar.message",
@@ -220,6 +226,14 @@ public class PluginConfig {
 
     public boolean isPreventDespawn() {
         return preventDespawn;
+    }
+
+    public boolean isAllowShopkeepersTrading() {
+        return allowShopkeepersTrading;
+    }
+
+    public boolean isAllowShopkeepersEditor() {
+        return allowShopkeepersEditor;
     }
 
     public String getAddSuccess() {

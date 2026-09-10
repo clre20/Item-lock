@@ -34,12 +34,14 @@ public class WorldInteractionListener implements Listener {
     private final PluginConfig config;
     private final ItemMatcher itemMatcher;
     private final FeedbackService feedbackService;
+    private final clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook shopkeepersHook;
 
-    public WorldInteractionListener(org.bukkit.plugin.Plugin plugin, PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService) {
+    public WorldInteractionListener(org.bukkit.plugin.Plugin plugin, PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService, clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook shopkeepersHook) {
         this.plugin = plugin;
         this.config = config;
         this.itemMatcher = itemMatcher;
         this.feedbackService = feedbackService;
+        this.shopkeepersHook = shopkeepersHook;
     }
 
     /**
@@ -58,6 +60,11 @@ public class WorldInteractionListener implements Listener {
 
         Block clickedBlock = event.getClickedBlock();
         if (clickedBlock == null) {
+            return;
+        }
+
+        // 若點擊的方塊為 Shopkeeper 方塊（例如告示牌商店），放行交互以開啟商店
+        if (shopkeepersHook.isAvailable() && shopkeepersHook.isShopkeeperBlock(clickedBlock)) {
             return;
         }
 
@@ -90,6 +97,12 @@ public class WorldInteractionListener implements Listener {
         }
 
         Entity target = event.getRightClicked();
+
+        // 若點擊的實體為 Shopkeeper（如盔甲架商店或村民商店），放行交互以開啟商店介面
+        if (shopkeepersHook.isAvailable() && shopkeepersHook.isShopkeeperEntity(target)) {
+            return;
+        }
+
         if (target instanceof ItemFrame || target instanceof ArmorStand) {
             event.setCancelled(true);
             feedbackService.sendDenyFeedback(player);

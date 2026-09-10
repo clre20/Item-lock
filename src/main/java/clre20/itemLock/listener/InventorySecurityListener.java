@@ -1,5 +1,7 @@
 package clre20.itemLock.listener;
 
+import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
+import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.feedback.FeedbackService;
 import clre20.itemLock.matcher.ItemMatcher;
 import clre20.itemLock.security.ContainerWhitelist;
@@ -18,15 +20,20 @@ import org.bukkit.inventory.ItemStack;
 /**
  * 介面操作全管道封鎖監聽器 (Inventory Zero-Trust Security)。
  * 當玩家開啟的頂部介面不在純存儲白名單內時，徹底封死所有移入、加工、偷換操作。
+ * 支援與 Shopkeepers 插件深度相容（放行交易介面與編輯設定介面）。
  */
 public class InventorySecurityListener implements Listener {
 
+    private final PluginConfig config;
     private final ItemMatcher itemMatcher;
     private final FeedbackService feedbackService;
+    private final ShopkeepersHook shopkeepersHook;
 
-    public InventorySecurityListener(ItemMatcher itemMatcher, FeedbackService feedbackService) {
+    public InventorySecurityListener(PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService, ShopkeepersHook shopkeepersHook) {
+        this.config = config;
         this.itemMatcher = itemMatcher;
         this.feedbackService = feedbackService;
+        this.shopkeepersHook = shopkeepersHook;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -38,7 +45,11 @@ public class InventorySecurityListener implements Listener {
         Inventory topInventory = event.getView().getTopInventory();
         Inventory clickedInventory = event.getClickedInventory();
         int rawSlot = event.getRawSlot();
-        int topSize = topInventory.getSize();
+
+        // 檢查是否處於允許的 Shopkeepers 介面中（交易或編輯介面）
+        if (isShopkeepersAllowed(player, topInventory)) {
+            return;
+        }
 
         boolean isTopPureStorage = ContainerWhitelist.isPureStorage(topInventory);
         boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
@@ -112,6 +123,12 @@ public class InventorySecurityListener implements Listener {
 
         Inventory topInventory = event.getView().getTopInventory();
         int topSize = topInventory.getSize();
+
+        // 檢查是否處於允許的 Shopkeepers 介面中（交易或編輯介面）
+        if (isShopkeepersAllowed(player, topInventory)) {
+            return;
+        }
+
         boolean isTopPureStorage = ContainerWhitelist.isPureStorage(topInventory);
         boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
 
@@ -149,6 +166,19 @@ public class InventorySecurityListener implements Listener {
                 return;
             }
         }
+    }
+
+    private boolean isShopkeepersAllowed(Player player, Inventory topInventory) {
+        if (!shopkeepersHook.isAvailable()) {
+            return false;
+        }
+        if (config.isAllowShopkeepersTrading() && shopkeepersHook.isShopkeepersTrading(player, topInventory)) {
+            return true;
+        }
+        if (config.isAllowShopkeepersEditor() && shopkeepersHook.isShopkeepersEditor(player, topInventory)) {
+            return true;
+        }
+        return false;
     }
 
     private void cancelAndFeedback(org.bukkit.event.Cancellable event, Player player) {
