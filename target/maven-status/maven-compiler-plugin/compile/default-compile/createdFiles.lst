@@ -1,0 +1,14 @@
+clre20\itemLock\listener\WorldInteractionListener.class
+clre20\itemLock\feedback\FeedbackService.class
+clre20\itemLock\matcher\ItemMatcher.class
+clre20\itemLock\template\TemplateManager.class
+clre20\itemLock\ItemLock.class
+clre20\itemLock\listener\InventorySecurityListener.class
+clre20\itemLock\model\ItemTemplate.class
+clre20\itemLock\listener\CraftingSecurityListener.class
+clre20\itemLock\matcher\MatchResult.class
+clre20\itemLock\listener\AutomationSecurityListener.class
+clre20\itemLock\command\ItemLockTabCompleter.class
+clre20\itemLock\command\ItemLockCommand.class
+clre20\itemLock\security\ContainerWhitelist.class
+clre20\itemLock\config\PluginConfig.class

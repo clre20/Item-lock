@@ -1,0 +1,18 @@
+name: Item-lock
+description: 高安全性物品保護與防修改系統
+version: '${version}'
+main: clre20.itemLock.ItemLock
+api-version: '1.21'
+load: POSTWORLD
+authors: [ Clre20 ]
+
+commands:
+  itemlock:
+    description: Item-lock 主管理指令
+    permission: itemlock.admin
+    usage: /itemlock [help|add|remove|check|list|reload]
+
+permissions:
+  itemlock.admin:
+    description: 允許使用 Item-lock 所有管理指令 (OP Level 2)
+    default: op

@@ -1,0 +1,63 @@
+# Item-lock 全域設定檔
+
+# 是否禁止按 Q 丟棄受保護物品
+deny-drop: true
+
+# 是否禁止手持受保護物品右鍵非純容器方塊
+deny-altar-interact: true
+
+# 是否禁止將受保護物品放入展示框或盔甲架
+deny-entity-interact: true
+
+# 漏斗物流管制設定
+hopper:
+  # 是否允許漏斗抽取/傳送受保護物品
+  allow-move: false
+  # 是否允許地面漏斗吸取掉落的受保護物品
+  allow-pickup: false
+
+# 掉落實體安全防護
+drop-protection:
+  # 掉落物是否防止自然消失
+  prevent-despawn: false
+
+# 反饋與體驗設定
+feedback:
+  actionbar:
+    enabled: true
+    message: "<red>⚠ 此物品受特殊保護，無法在此介面中進行修改或加工！</red>"
+  sound:
+    enabled: true
+    type: "ENTITY_VILLAGER_NO"
+    volume: 1.0
+    pitch: 0.8
+  # 提示與音效觸發冷卻時間 (毫秒)
+  cooldown-ms: 1000
+
+# 訊息設定
+messages:
+  prefix: "<gold>[Item-Lock]</gold> "
+  no-permission: "<red>你沒有權限執行此指令！</red>"
+  player-only: "<red>此指令僅能由玩家在遊戲內執行！</red>"
+  reload-success: "<green>設定檔與物品樣本庫已成功重新載入！(共載入 <count> 個保護樣本)</green>"
+  add-success: "<green>已成功將主手物品登錄為保護樣本：<gold><id></gold></green>"
+  add-already-exists: "<red>保護樣本 <gold><id></gold> 已存在！若要覆蓋請使用：<yellow>/itemlock add <id> -f</yellow></red>"
+  add-overwrite-success: "<green>已成功覆蓋並更新保護樣本：<gold><id></gold></green>"
+  add-air: "<red>主手不可為空！請手持欲保護的物品。</red>"
+  add-invalid-name: "<red>名稱格式錯誤！僅能使用英數字、底線與連字符 (^[a-zA-Z0-9_-]+$)</red>"
+  remove-success: "<green>已成功刪除保護樣本：<gold><id></gold></green>"
+  remove-not-found: "<red>找不到名為 <gold><id></gold> 的保護樣本！</red>"
+  check-protected: "<green>手持物品受特殊保護！匹配樣本：<gold><id></gold></green>"
+  check-not-protected: "<yellow>手持物品不受保護。</yellow>"
+  list-header: "<gold>===== [ 已登錄的保護物品樣本 (<count>) ] =====</gold>"
+  list-item: "<yellow>- <gold><id></gold> (<white><material></white>)</yellow>"
+  list-empty: "<gray>目前尚未登錄任何保護物品樣本。</gray>"
+  help:
+    - "<gold>================ [ Item-Lock 指令手冊 ] ================"
+    - "<yellow>/itemlock help <gray>- 顯示指令說明手冊"
+    - "<yellow>/itemlock add <名稱> [-f] <gray>- 將主手物品登錄為保護樣本 (-f 強制覆蓋)"
+    - "<yellow>/itemlock remove <名稱> <gray>- 刪除指定的保護樣本"
+    - "<yellow>/itemlock check <gray>- 檢測主手物品是否受保護"
+    - "<yellow>/itemlock list <gray>- 列出所有已登錄的保護樣本"
+    - "<yellow>/itemlock reload <gray>- 重新載入設定檔與保護樣本庫"
+    - "<gold>========================================================"
