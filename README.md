@@ -6,7 +6,7 @@ Item-lock 是一款針對 Minecraft Paper 及 Purpur 伺服器端（相容 Minec
 
 ## 核心架構與儲存設計
 
-### 單檔樣本獨立儲存 (Per-Item YAML)
+### 單檔樣本獨立儲存
 系統全面採用單檔獨立配置設計，便於伺服器管理員針對個別樣本進行備份、版本控管與跨伺服器轉移：
 
 ```text
@@ -18,31 +18,31 @@ plugins/Item-lock/
 ```
 
 * **原生二進位序列化**：樣本資料透過 Paper 原生 `ItemStack.serializeAsBytes()` 結合 Base64 儲存，完整保留 1.20.5+ 引入的全部 Data Components，包含自定義模型資料（Custom Model Data）、附魔標籤、屬性修飾符與 PersistentDataContainer（PDC）。
-* **零磁碟延遲快取 (Zero Disk Latency)**：伺服器開機或執行重新載入時，系統遍歷 `templates/*.yml` 載入記憶體快取。遊戲內的即時安全比對全數於記憶體內完成，主執行緒不產生任何磁碟 I/O。
+* **零磁碟延遲快取**：伺服器開機或執行重新載入時，系統遍歷 `templates/*.yml` 載入記憶體快取。遊戲內的即時安全比對全數於記憶體內完成，主執行緒不產生任何磁碟 I/O。
 * **路徑安全性校驗**：樣本名稱嚴格限制僅能使用英數字、底線與連字符（正則規範：`^[a-zA-Z0-9_-]+$`），杜絕目錄遍歷（Directory Traversal）漏洞。
 * **覆蓋防呆機制**：若嘗試登錄已存在的樣本名稱，系統會主動攔截並要求附帶強制覆蓋參數 `-f`，防止管理員因暫用命名不慎沖掉既有配置。
 
 ---
 
-## 智慧遮罩比對引擎 (Component Matcher)
+## 智慧遮罩比對引擎
 
 為避免玩家在正常遊戲行為中因物品磨損或維修而導致保護失效，比對引擎採三層式過濾機制：
 
-1. **第一層：材質初篩 (Material Filter)**
+1. **第一層：材質初篩**
    * 優先比對物品 `Material`。若材質不一致，直接於單一運算週期剔除，大幅降低後續運算負擔。
 
-2. **第二層：動態組件遮罩 (Dynamic Component Masking)**
+2. **第二層：動態組件遮罩**
    * 自動屏蔽正常遊戲過程中會動態變動的組件數值：
      * 排除 `minecraft:damage`：耐久度耗損不影響保護判定。
      * 排除 `minecraft:repair_cost`：鐵砧使用累積的修復懲罰不影響判定。
 
-3. **第三層：特徵指紋比對 (Fingerprint Matching)**
+3. **第三層：特徵指紋比對**
    * **武器與一般裝備**：比對 `custom_model_data`、`custom_name` / `item_name`、`lore`、`enchantments` 映射表及持久化標籤（PersistentDataContainer, PDC），並驗證其餘靜態組件完全一致。
-   * **已繪製地圖 (Filled Map)**：精確比對核心組件 `minecraft:map_id`。只要 Map ID 與母本一致即判定命中。
+   * **已繪製地圖**：精確比對核心組件 `minecraft:map_id`。只要 Map ID 與母本一致即判定命中。
 
 ---
 
-## 零信任安全攔截網 (Zero-Trust Security)
+## 零信任安全攔截網
 
 系統不依賴第三方插件黑名單，全數採用白名單存儲容器原則：
 
@@ -55,11 +55,11 @@ plugins/Item-lock/
 * 玩家自身背包（`PlayerInventory`）
 
 ### 介面操作全管道封鎖
-若玩家開啟的頂部介面（Top Inventory）不在白名單內（包含鐵砧、砂輪、鐵匠台、製圖台、熔爐，以及 Slimefun、自定義強化台等虛擬 GUI）：
-* **滑鼠游標放入 (Cursor Drop)**：取消事件，禁止將保護物品放入非白名單介面槽位。
-* **Shift 快速移入 (Quick Move)**：取消事件，禁止自背包快速傳送進入非白名單介面。
-* **數字鍵偷換 (Hotbar Swap 1~9)**：取消事件，禁止透過快捷列快捷鍵進行物品置換。
-* **滑鼠拖拉塗抹 (InventoryDragEvent)**：取消事件，禁止以游標拖曳將物品劃入非白名單槽位。
+若玩家開啟的頂部介面不在白名單內（包含鐵砧、砂輪、鐵匠台、製圖台、熔爐，以及 Slimefun、自定義強化台等虛擬 GUI）：
+* **滑鼠游標放入**：取消事件，禁止將保護物品放入非白名單介面槽位。
+* **Shift 快速移入**：取消事件，禁止自背包快速傳送進入非白名單介面。
+* **數字鍵偷換**：取消事件，禁止透過快捷列快捷鍵進行物品置換。
+* **滑鼠拖拉塗抹**：取消事件，禁止以游標拖曳將物品劃入非白名單槽位。
 
 ### 工作台與隨身 2x2 合成防拓印
 * 監聽 `PrepareItemCraftEvent` 與 `CraftItemEvent`。
@@ -79,27 +79,27 @@ plugins/Item-lock/
 
 ---
 
-## 第三方插件相容支援 (Shopkeepers)
+## 第三方插件相容支援
 
 本插件深度相容 [Shopkeepers](https://www.spigotmc.org/resources/shopkeepers.80756/) 村民商店插件，允許受保護物品作為商店交易道具或貨幣使用：
 
-* **交易介面相容 (Trading Interface)**：
+* **交易介面相容**：
   * 開啟 Shopkeepers 村民交易視窗時，允許玩家使用受保護物品作為貨幣支付放入交易槽。
   * 允許玩家從交易產物槽安全領取受保護物品。
-* **設定與編輯介面相容 (Editor Interface)**：
-  * 店主或管理員於 Shopkeepers 編輯介面（Trade Editor）中，可自由放入、設定或更換包含保護物品在內的交易公式配方。
+* **設定與編輯介面相容**：
+  * 店主或管理員於 Shopkeepers 編輯介面中，可自由放入、設定或更換包含保護物品在內的交易公式配方。
 * **實體與方塊辨識**：
   * 自動辨識 Shopkeeper 實體（含盔甲架型態店主）與方塊（告示牌商店），手持受保護物品右鍵店主時正常開啟商店介面，不予誤攔截。
 * 可於 `config.yml` 透過 `compatibility.shopkeepers.allow-trading` 與 `allow-editor` 分別進行獨立開關控制。
 
 ---
 
-## 防幽靈物品與操作回饋 (UX & Anti-Desync)
+## 防幽靈物品與操作回饋
 
-* **Tick 延遲同步 (Anti-Ghost Item)**：當違規操作被取消時，排程於下 1 個 Tick 對玩家執行 `player.updateInventory()`，強制對齊伺服器與客戶端數據，杜絕客戶端預測產生的幽靈物品現象。
+* **Tick 延遲同步**：當違規操作被取消時，排程於下 1 個 Tick 對玩家執行 `player.updateInventory()`，強制對齊伺服器與客戶端數據，杜絕客戶端預測產生的幽靈物品現象。
 * **Actionbar 警示**：透過 Adventure API 於玩家螢幕正下方顯示警示訊息。
 * **音效打擊反饋**：播放原版拒絕音效（例如 `ENTITY_VILLAGER_NO`）。
-* **冷卻防刷 (Cooldown)**：以暫態 UUID 時間戳記錄警示觸發時機，將提示與音效限制為每秒最多觸發一次，避免連點造成干擾。
+* **冷卻防刷 **：以暫態 UUID 時間戳記錄警示觸發時機，將提示與音效限制為每秒最多觸發一次，避免連點造成干擾。
 
 ---
 
@@ -116,89 +116,120 @@ plugins/Item-lock/
 | `/itemlock list` | 無 | 列出所有已登錄的樣本名稱、對應檔案與物品材質。 |
 | `/itemlock reload` | 無 | 清空快取、重新掃描並載入樣本檔案與全域設定。 |
 
-### 智慧補全 (Tab Completion)
-* 輸入 `/itemlock `：自動補全全部子指令（`add`、`check`、`help`、`list`、`reload`、`remove`）。
-* 輸入 `/itemlock remove `：自動補全所有已註冊的範本名稱。
-* 輸入 `/itemlock add `：主手手持物品時自動建議物品材質小寫名稱；若輸入名稱已存在，自動提示 `-f` 參數。
+# Item-lock
+
+Item-lock is a high-security item protection and anti-tamper system designed for Minecraft Paper and Purpur servers (compatible with Minecraft 1.20.5 through the latest 1.21.x releases). Bypassing error-prone blacklists, it leverages a "Zero-Trust Container Safety Net" alongside a "Dynamic Mask Feature Comparison Engine" to completely block illicit modifications, processing, duplications, and conversions across vanilla mechanics and third-party plugin interfaces.
 
 ---
 
-## 設定檔說明 (`config.yml`)
+## Core Architecture & Storage Design
 
-```yaml
-# 是否禁止按 Q 丟棄受保護物品 (true: 禁止丟棄; false: 允許丟棄但實體免疫所有傷害與銷毀)
-deny-drop: true
+### Individual Template Storage
+The system uses a standalone file layout per template, streamlining backups, version control, and cross-server transfers:
 
-# 是否禁止手持受保護物品右鍵非純容器方塊 (防止觸發祭壇/多方塊機器轉化)
-deny-altar-interact: true
-
-# 是否禁止將受保護物品放入展示框或盔甲架
-deny-entity-interact: true
-
-# 漏斗物流管制設定
-hopper:
-  # 是否允許漏斗抽取/傳送受保護物品 (true: 允許漏斗傳輸; false: 禁止漏斗傳輸，預設 false)
-  allow-move: false
-  # 是否允許地面漏斗吸取掉落的受保護物品 (true: 允許漏斗拾取; false: 禁止漏斗吸取，預設 false)
-  allow-pickup: false
-
-# 掉落實體安全防護
-drop-protection:
-  # 掉落物是否防止自然消失 (false: 5分鐘後正常消失防卡頓; true: 永遠不消失，預設 false)
-  prevent-despawn: false
-
-# 第三方插件相容設定
-compatibility:
-  shopkeepers:
-    # 是否允許在 Shopkeepers 交易介面使用受保護物品 (作為交易貨幣或換取獲得，預設 true)
-    allow-trading: true
-    # 是否允許在 Shopkeepers 設定/編輯介面 (Editor) 設定受保護物品 (預設 true)
-    allow-editor: true
-
-# 反饋與體驗設定 (UX & Anti-Desync)
-feedback:
-  actionbar:
-    enabled: true
-    message: "<red>⚠ 此物品受特殊保護，無法在此介面中進行修改或加工！</red>"
-  sound:
-    enabled: true
-    type: "ENTITY_VILLAGER_NO"
-    volume: 1.0
-    pitch: 0.8
-  cooldown-ms: 1000
-
-# 系統提示訊息 (支援 MiniMessage 標籤與 Legacy 顏色代碼)
-messages:
-  prefix: "<gold>[Item-Lock]</gold> "
-  no-permission: "<red>你沒有權限執行此指令！</red>"
-  player-only: "<red>此指令僅能由玩家在遊戲內執行！</red>"
-  reload-success: "<green>設定檔與物品樣本庫已成功重新載入！(共載入 <count> 個保護樣本)</green>"
-  add-success: "<green>已成功將主手物品登錄為保護樣本：<gold><id></gold></green>"
-  add-already-exists: "<red>保護樣本 <gold><id></gold> 已存在！若要覆蓋請使用：<yellow>/itemlock add <id> -f</yellow></red>"
-  add-overwrite-success: "<green>已成功覆蓋並更新保護樣本：<gold><id></gold></green>"
-  add-air: "<red>主手不可為空！請手持欲保護的物品。</red>"
-  add-invalid-name: "<red>名稱格式錯誤！僅能使用英數字、底線與連字符 (^[a-zA-Z0-9_-]+$)</red>"
-  remove-success: "<green>已成功刪除保護樣本：<gold><id></gold></green>"
-  remove-not-found: "<red>找不到名為 <gold><id></gold> 的保護樣本！</red>"
-  check-protected: "<green>手持物品受特殊保護！匹配樣本：<gold><id></gold></green>"
-  check-not-protected: "<yellow>手持物品不受保護。</yellow>"
-  list-header: "<gold>===== [ 已登錄的保護物品樣本 (<count>) ] =====</gold>"
-  list-item: "<yellow>- <gold><id></gold> (<white><material></white>)</yellow>"
-  list-empty: "<gray>目前尚未登錄任何保護物品樣本。</gray>"
+```text
+plugins/Item-lock/
+├── config.yml              # Global settings (messages, sound toggles, hopper & drop rules)
+└── templates/              # Protected item templates (one YAML per template)
+    ├── dragon_sword.yml    # Example: custom gear protection
+    └── secret_map.yml      # Example: core map configuration
 ```
+
+* **Native Binary Serialization**: Template data is stored using Paper's native `ItemStack.serializeAsBytes()` combined with Base64, preserving all Data Components introduced in 1.20.5+ (Custom Model Data, enchantments, attribute modifiers, and PersistentDataContainers).
+* **Zero Disk-I/O In-Game**: Templates in `templates/*.yml` load into memory at boot and during reload. All real-time checks run strictly in-memory without blocking the main server thread with disk operations.
+* **Path Traversal Sanitization**: Template names strictly accept alphanumeric characters, underscores, and hyphens (`^[a-zA-Z0-9_-]+$`) to prevent directory traversal exploits.
+* **Overwrite Guard**: Attempting to register an existing template name is blocked unless explicitly overridden with the `-f` flag.
 
 ---
 
-## 構建與部署
+## Dynamic Mask Comparison Engine
 
-### 環境需求
-* Java 21 或更高版本
-* Maven 3.8 或更高版本
-* Paper / Purpur 1.20.5+ 伺服器核心
+To prevent normal gameplay wear, tears, and maintenance from voiding item protection, the engine uses a 3-layer filter:
 
-### 編譯打包
-於專案根目錄執行：
-```bash
-mvn clean package
-```
-產出的外掛 Jar 檔位於 `target/Item-lock-1.0.0.jar`，將其放置於伺服器 `plugins/` 目錄並重新啟動伺服器即可啟用。
+1. **Layer 1: Material Check**
+   * Validates the item's `Material`. Mismatches are rejected in a single cycle, eliminating unneeded overhead.
+
+2. **Layer 2: Dynamic Component Masking**
+   * Masks out fluid gameplay components during checks:
+     * Ignores `minecraft:damage`: Durability loss will not bypass protection.
+     * Ignores `minecraft:repair_cost`: Accumulated anvil repair penalties will not bypass protection.
+
+3. **Layer 3: Fingerprint Matching**
+   * **Weapons & Standard Equipment**: Matches `custom_model_data`, `custom_name` / `item_name`, `lore`, `enchantments`, and the PersistentDataContainer (PDC), verifying that all other static components match precisely.
+   * **Filled Maps**: Matches the core `minecraft:map_id` component. Matches are triggered if the Map ID aligns with the master template.
+
+---
+
+## Zero-Trust Security Interception
+
+The plugin discards fragile third-party blocklists, enforcing a strict whitelist for storage containers.
+
+### Storage Whitelist Containers
+Access is restricted strictly to pure storage blocks:
+* Chests, Double Chests, Trapped Chests (`Chest` / `DoubleChest`, physical world blocks only)
+* Barrels (`Barrel`)
+* Shulker Boxes (`Shulker Box`)
+* Ender Chests (`Ender Chest`)
+* Player inventory (`PlayerInventory`)
+
+### Comprehensive GUI Pipeline Blockade
+If an opened top inventory falls outside the whitelist (e.g., anvils, grindstones, smithing tables, cartography tables, furnaces, or virtual menus such as Slimefun workbenches):
+* **Cursor Placement**: Cancels events moving protected items into unauthorized slots.
+* **Shift-Click Transfers**: Blocks rapid transfers from the player inventory into forbidden interfaces.
+* **Hotbar Swapping**: Blocks number-key slot swaps.
+* **Mouse Dragging / Painting**: Prevents painting or distributing items across non-whitelisted slots.
+
+### Crafting Grid & Map Cloning Prevention
+* Hooks into `PrepareItemCraftEvent` and `CraftItemEvent`.
+* Scans both 3x3 crafting tables and 2x2 player inventory grids. If any protected item or map enters the matrix, the recipe output is cleared to `null` and the event is cancelled, shutting down vanilla map cloning and crafting exploits.
+
+### Hopper & Automation Logistics
+* Listens to `InventoryMoveItemEvent`: Cancels item transfers if the item is protected and the destination is not an approved storage container.
+* Listens to `InventoryPickupItemEvent`: Prevents hoppers from vacuuming protected items off the floor.
+* Configurable via `config.yml` with toggles for hopper transfers (`allow-move`) and hopper pickups (`allow-pickup`).
+
+### World Interactions & Drop Protections
+* **Altar Block Conversion Prevention**: Cancels right-click interactions on non-storage blocks when holding protected items, preventing multi-block machine triggers or ritual sacrifices.
+* **Item Frame Protection**: Cancels right-clicks targeting item frames and armor stands while holding protected items.
+* **Drop Prevention**: Dropping items via the drop key (Q) can be locked down via `deny-drop: true`.
+* **Entity Immunity**: If item drops are permitted, spawned drop entities receive invulnerability against fire, lava, explosions, and general damage, and cannot be picked up by mobs (e.g., zombies, piglins).
+* **Vanilla `/give` Entity Cleanup**: Detects pickup animation items (`makeFakeItem`) produced by command blocks or `/give`, clearing them right as animations finish to prevent uncollectible residue.
+
+---
+
+## Third-Party Compatibility
+
+Item-lock features native integration with the [Shopkeepers](https://www.spigotmc.org/resources/shopkeepers.80756/) plugin, allowing protected items to serve as trade stock or currency:
+
+* **Trading Windows**:
+  * Allows protected items in trading input slots as valid currency.
+  * Allows players to collect protected items safely from trade output slots.
+* **Editor Interface**:
+  * Shopkeepers and server staff can insert, set, or swap trade recipes using protected items inside the Shopkeepers editor GUI.
+* **Target Recognition**:
+  * Detects Shopkeeper entities (including armor stands) and blocks (sign shops), allowing shop menus to open without false-positive interaction cancellations.
+* Configurable independently via `compatibility.shopkeepers.allow-trading` and `allow-editor` in `config.yml`.
+
+---
+
+## Anti-Ghost Items & Player Feedback
+
+* **Tick-Delayed Synchronization**: When an illegal move is cancelled, `player.updateInventory()` is scheduled on the subsequent tick to reconcile the server state with the client, eliminating client-side desync and ghost items.
+* **Actionbar Alerts**: Displays clean, real-time alert notifications via the Adventure API.
+* **Audio Feedback**: Triggers vanilla refusal audio (e.g., `ENTITY_VILLAGER_NO`).
+* **Cooldown Protection**: Tracks alert events via transient UUID timestamps, rate-limiting warnings and sound triggers to once per second to mitigate spam.
+
+---
+
+## Commands & Permissions
+
+All commands require the `itemlock.admin` permission node (defaults to OP Level 2):
+
+| Command | Arguments | Description |
+| :--- | :--- | :--- |
+| `/itemlock help` | None | Displays the formatted command manual. |
+| `/itemlock add <name> [-f]` | Template name (optional `-f`) | Samples the main-hand item, resets durability and repair costs to zero, and saves it. Requires `-f` to overwrite existing templates. |
+| `/itemlock remove <name>` | Existing template name | Deletes the template file and unloads it from memory. |
+| `/itemlock check` | None | Inspects the main-hand item to verify if it is protected and prints the matching template name. |
+| `/itemlock list` | None | Lists all loaded template names, files, and corresponding materials. |
+| `/itemlock reload` | None | Clears the cache and reloads all template files and global settings. |
