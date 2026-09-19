@@ -1,5 +1,6 @@
 package clre20.itemLock.listener;
 
+import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.feedback.FeedbackService;
@@ -21,6 +22,7 @@ import org.bukkit.inventory.ItemStack;
  * 介面操作全管道封鎖監聽器 (Inventory Zero-Trust Security)。
  * 當玩家開啟的頂部介面不在純存儲白名單內時，徹底封死所有移入、加工、偷換操作。
  * 支援與 Shopkeepers 插件深度相容（放行交易介面與編輯設定介面）。
+ * 支援與 eShulkerBox 等手持/隨身開啟潛影盒插件相容（放行純存儲取放操作）。
  */
 public class InventorySecurityListener implements Listener {
 
@@ -28,12 +30,15 @@ public class InventorySecurityListener implements Listener {
     private final ItemMatcher itemMatcher;
     private final FeedbackService feedbackService;
     private final ShopkeepersHook shopkeepersHook;
+    private final EShulkerBoxHook eshulkerBoxHook;
 
-    public InventorySecurityListener(PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService, ShopkeepersHook shopkeepersHook) {
+    public InventorySecurityListener(PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService,
+                                     ShopkeepersHook shopkeepersHook, EShulkerBoxHook eshulkerBoxHook) {
         this.config = config;
         this.itemMatcher = itemMatcher;
         this.feedbackService = feedbackService;
         this.shopkeepersHook = shopkeepersHook;
+        this.eshulkerBoxHook = eshulkerBoxHook;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -51,7 +56,7 @@ public class InventorySecurityListener implements Listener {
             return;
         }
 
-        boolean isTopPureStorage = ContainerWhitelist.isPureStorage(topInventory);
+        boolean isTopPureStorage = isPureStorage(player, topInventory);
         boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
 
         // 情況 A：點擊頂部介面（Top Inventory）
@@ -129,7 +134,7 @@ public class InventorySecurityListener implements Listener {
             return;
         }
 
-        boolean isTopPureStorage = ContainerWhitelist.isPureStorage(topInventory);
+        boolean isTopPureStorage = isPureStorage(player, topInventory);
         boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
 
         // 若頂部介面已是純存儲容器，且不是隨身合成欄位，則放行
@@ -166,6 +171,27 @@ public class InventorySecurityListener implements Listener {
                 return;
             }
         }
+    }
+
+    /**
+     * 判定指定介面是否為純存儲容器（含真實方塊容器、末影箱、隨身背包及受相容的虛擬/手持潛影盒）。
+     */
+    private boolean isPureStorage(Player player, Inventory topInventory) {
+        if (ContainerWhitelist.isPureStorage(topInventory)) {
+            return true;
+        }
+
+        // eShulkerBox 手持/隨身開啟潛影盒相容判定
+        if (config.isAllowEShulkerBox() && eshulkerBoxHook.isEShulkerBoxOpen(player, topInventory)) {
+            return true;
+        }
+
+        // 虛擬潛影盒通用開關判定
+        if (config.isAllowVirtualShulkerBox() && ContainerWhitelist.isVirtualShulkerBox(topInventory)) {
+            return true;
+        }
+
+        return false;
     }
 
     private boolean isShopkeepersAllowed(Player player, Inventory topInventory) {

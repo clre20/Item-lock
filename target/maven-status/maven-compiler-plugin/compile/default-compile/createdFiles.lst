@@ -8,10 +8,13 @@ clre20\itemLock\listener\InventorySecurityListener.class
 clre20\itemLock\model\ItemTemplate.class
 clre20\itemLock\listener\CraftingSecurityListener.class
 clre20\itemLock\matcher\MatchResult.class
+clre20\itemLock\compatibility\eshulkerbox\EShulkerBoxHook.class
 clre20\itemLock\listener\AutomationSecurityListener.class
 clre20\itemLock\command\ItemLockTabCompleter.class
 clre20\itemLock\compatibility\shopkeepers\ShopkeepersHook.class
 clre20\itemLock\compatibility\shopkeepers\ShopkeepersHookImpl.class
 clre20\itemLock\command\ItemLockCommand.class
 clre20\itemLock\security\ContainerWhitelist.class
+clre20\itemLock\compatibility\eshulkerbox\NoOpEShulkerBoxHook.class
+clre20\itemLock\compatibility\eshulkerbox\EShulkerBoxHookImpl.class
 clre20\itemLock\config\PluginConfig.class

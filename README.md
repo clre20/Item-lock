@@ -81,6 +81,7 @@ plugins/Item-lock/
 
 ## 第三方插件相容支援
 
+### Shopkeepers 村民商店
 本插件深度相容 [Shopkeepers](https://www.spigotmc.org/resources/shopkeepers.80756/) 村民商店插件，允許受保護物品作為商店交易道具或貨幣使用：
 
 * **交易介面相容**：
@@ -91,6 +92,16 @@ plugins/Item-lock/
 * **實體與方塊辨識**：
   * 自動辨識 Shopkeeper 實體（含盔甲架型態店主）與方塊（告示牌商店），手持受保護物品右鍵店主時正常開啟商店介面，不予誤攔截。
 * 可於 `config.yml` 透過 `compatibility.shopkeepers.allow-trading` 與 `allow-editor` 分別進行獨立開關控制。
+
+### eShulkerBox 手持潛影盒
+本插件深度相容 [eShulkerBox](https://modrinth.com/plugin/eshulkerbox) 手持/隨身開啟潛影盒插件：
+
+* **手持與空氣開啟介面支援**：
+  * 支援玩家手持潛影盒右鍵空氣或隨身開啟時，在虛擬潛影盒介面中自由存入與取出受保護物品。
+  * 完整支援滑鼠點擊取放、Shift 快速移入、數字鍵交換及滑鼠拖拉塗抹等全管道操作。
+* **零信任安全機制無損**：
+  * 透過底層動態反射與介面特徵檢驗雙重過濾，僅對純存儲用途之潛影盒介面放行，其餘非存儲自定義加工 GUI 與強化台依然維持嚴格攔截。
+* 可於 `config.yml` 透過 `compatibility.eshulkerbox.allow-handheld-shulkerbox` 進行獨立開關控制。
 
 ---
 
@@ -199,6 +210,7 @@ If an opened top inventory falls outside the whitelist (e.g., anvils, grindstone
 
 ## Third-Party Compatibility
 
+### Shopkeepers Integration
 Item-lock features native integration with the [Shopkeepers](https://www.spigotmc.org/resources/shopkeepers.80756/) plugin, allowing protected items to serve as trade stock or currency:
 
 * **Trading Windows**:
@@ -209,6 +221,16 @@ Item-lock features native integration with the [Shopkeepers](https://www.spigotm
 * **Target Recognition**:
   * Detects Shopkeeper entities (including armor stands) and blocks (sign shops), allowing shop menus to open without false-positive interaction cancellations.
 * Configurable independently via `compatibility.shopkeepers.allow-trading` and `allow-editor` in `config.yml`.
+
+### eShulkerBox Handheld Shulker Boxes
+Item-lock features dedicated integration with the [eShulkerBox](https://modrinth.com/plugin/eshulkerbox) handheld/virtual shulker box plugin:
+
+* **Handheld & Air-Open Interface Support**:
+  * Enables players opening a shulker box in hand or in air to deposit and retrieve protected items within the virtual shulker box interface.
+  * Fully supports mouse placement, shift-clicking, number-key hotbar swaps, and mouse dragging/painting.
+* **Zero-Trust Security Preserved**:
+  * Using dynamic reflection combined with inventory signature verification, only pure-storage shulker box interfaces are allowed. Custom crafting GUIs and non-storage plugin menus remain strictly blocked.
+* Configurable independently via `compatibility.eshulkerbox.allow-handheld-shulkerbox` in `config.yml`.
 
 ---
 

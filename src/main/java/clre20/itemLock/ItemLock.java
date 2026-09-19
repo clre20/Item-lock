@@ -2,6 +2,7 @@ package clre20.itemLock;
 
 import clre20.itemLock.command.ItemLockCommand;
 import clre20.itemLock.command.ItemLockTabCompleter;
+import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.feedback.FeedbackService;
@@ -28,6 +29,7 @@ public final class ItemLock extends JavaPlugin {
     private ItemMatcher itemMatcher;
     private FeedbackService feedbackService;
     private ShopkeepersHook shopkeepersHook;
+    private EShulkerBoxHook eshulkerBoxHook;
 
     public static ItemLock getInstance() {
         return instance;
@@ -46,15 +48,20 @@ public final class ItemLock extends JavaPlugin {
         this.itemMatcher = new ItemMatcher(this.templateManager);
         this.feedbackService = new FeedbackService(this, this.pluginConfig);
 
-        // 3. 初始化第三方插件相容 Hook (Shopkeepers)
+        // 3. 初始化第三方插件相容 Hook (Shopkeepers, eShulkerBox)
         this.shopkeepersHook = ShopkeepersHook.create();
         if (this.shopkeepersHook.isAvailable()) {
             getLogger().info("已檢測到並成功掛接 Shopkeepers 插件！已啟用交易與編輯介面相容支援。");
         }
 
+        this.eshulkerBoxHook = EShulkerBoxHook.create();
+        if (this.eshulkerBoxHook.isAvailable()) {
+            getLogger().info("已檢測到並成功掛接 eShulkerBox 插件！已啟用手持開啟潛影盒相容支援。");
+        }
+
         // 4. 註冊安全監聽器
         PluginManager pm = getServer().getPluginManager();
-        pm.registerEvents(new InventorySecurityListener(this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook), this);
+        pm.registerEvents(new InventorySecurityListener(this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook, this.eshulkerBoxHook), this);
         pm.registerEvents(new CraftingSecurityListener(this.itemMatcher, this.feedbackService), this);
         pm.registerEvents(new AutomationSecurityListener(this.pluginConfig, this.itemMatcher), this);
         pm.registerEvents(new WorldInteractionListener(this, this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook), this);
@@ -95,5 +102,9 @@ public final class ItemLock extends JavaPlugin {
 
     public ShopkeepersHook getShopkeepersHook() {
         return shopkeepersHook;
+    }
+
+    public EShulkerBoxHook getEShulkerBoxHook() {
+        return eshulkerBoxHook;
     }
 }

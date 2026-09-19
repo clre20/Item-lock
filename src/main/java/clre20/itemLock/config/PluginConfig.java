@@ -31,6 +31,9 @@ public class PluginConfig {
     private boolean allowShopkeepersTrading;
     private boolean allowShopkeepersEditor;
 
+    private boolean allowEShulkerBox;
+    private boolean allowVirtualShulkerBox;
+
     private boolean actionbarEnabled;
     private String actionbarMessage;
 
@@ -84,6 +87,9 @@ public class PluginConfig {
 
         this.allowShopkeepersTrading = config.getBoolean("compatibility.shopkeepers.allow-trading", true);
         this.allowShopkeepersEditor = config.getBoolean("compatibility.shopkeepers.allow-editor", true);
+
+        this.allowEShulkerBox = config.getBoolean("compatibility.eshulkerbox.allow-handheld-shulkerbox", true);
+        this.allowVirtualShulkerBox = config.getBoolean("compatibility.virtual-shulkerbox.allow-virtual", true);
 
         this.actionbarEnabled = config.getBoolean("feedback.actionbar.enabled", true);
         this.actionbarMessage = config.getString("feedback.actionbar.message",
@@ -234,6 +240,14 @@ public class PluginConfig {
 
     public boolean isAllowShopkeepersEditor() {
         return allowShopkeepersEditor;
+    }
+
+    public boolean isAllowEShulkerBox() {
+        return allowEShulkerBox;
+    }
+
+    public boolean isAllowVirtualShulkerBox() {
+        return allowVirtualShulkerBox;
     }
 
     public String getAddSuccess() {

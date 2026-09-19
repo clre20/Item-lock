@@ -25,9 +25,20 @@ public final class ContainerWhitelist {
     private ContainerWhitelist() {}
 
     /**
-     * 檢查指定庫存是否為純存儲白名單容器。
+     * 檢查指定庫存是否為純存儲白名單容器（預設僅允許真實世界方塊實體或原生背包）。
      */
     public static boolean isPureStorage(Inventory inventory) {
+        return isPureStorage(inventory, false);
+    }
+
+    /**
+     * 檢查指定庫存是否為純存儲白名單容器。
+     *
+     * @param inventory 要檢測的庫存介面
+     * @param allowVirtualShulkerBox 是否允許無方塊實體的虛擬/隨身潛影盒
+     * @return 若為允許的純存儲容器則回傳 true
+     */
+    public static boolean isPureStorage(Inventory inventory, boolean allowVirtualShulkerBox) {
         if (inventory == null) {
             return false;
         }
@@ -57,10 +68,28 @@ public final class ContainerWhitelist {
 
         // 潛影盒
         if (type == InventoryType.SHULKER_BOX) {
-            return holder instanceof ShulkerBox;
+            if (holder instanceof ShulkerBox) {
+                return true;
+            }
+            if (allowVirtualShulkerBox && isVirtualShulkerBox(inventory)) {
+                return true;
+            }
+            return false;
         }
 
         return false;
+    }
+
+    /**
+     * 檢查指定庫存是否為無方塊實體的虛擬潛影盒（例如手持/隨身開啟的潛影盒）。
+     */
+    public static boolean isVirtualShulkerBox(Inventory inventory) {
+        if (inventory == null) {
+            return false;
+        }
+        return inventory.getType() == InventoryType.SHULKER_BOX
+                && inventory.getHolder() == null
+                && inventory.getLocation() == null;
     }
 
     /**

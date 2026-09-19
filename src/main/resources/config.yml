@@ -28,6 +28,12 @@ compatibility:
     allow-trading: true
     # 是否允許在 Shopkeepers 設定/編輯介面 (Editor) 設定受保護物品 (預設 true)
     allow-editor: true
+  eshulkerbox:
+    # 是否允許在 eShulkerBox 空手/手持開啟的潛影盒介面中存取受保護物品 (預設 true)
+    allow-handheld-shulkerbox: true
+  virtual-shulkerbox:
+    # 是否放行無方塊實體的虛擬潛影盒容器 (供隨身/手持潛影盒外掛存取受保護物品，預設 true)
+    allow-virtual: true
 
 # 反饋與體驗設定
 feedback:
