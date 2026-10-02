@@ -126,6 +126,7 @@ plugins/Item-lock/
 | `/itemlock check` | 無 | 檢測當前手持物品是否受保護，並顯示匹配的樣本名稱。 |
 | `/itemlock list` | 無 | 列出所有已登錄的樣本名稱、對應檔案與物品材質。 |
 | `/itemlock reload` | 無 | 清空快取、重新掃描並載入樣本檔案與全域設定。 |
+| `/itemlock gui` | 無 | 開啟選單可配置每種物品的權限。 |
 
 # Item-lock
 
