@@ -30,7 +30,7 @@ public class AutomationSecurityListener implements Listener {
         ItemStack item = event.getItem();
         if (itemMatcher.isProtected(item)) {
             // 若設定允許漏斗移動，則放行
-            if (config.isAllowHopperMove()) {
+            if (itemMatcher.isAllowHopperMove(item, config)) {
                 return;
             }
 
@@ -46,7 +46,7 @@ public class AutomationSecurityListener implements Listener {
         ItemStack item = event.getItem().getItemStack();
         if (itemMatcher.isProtected(item)) {
             // 若設定允許地面漏斗吸取，則放行
-            if (config.isAllowHopperPickup()) {
+            if (itemMatcher.isAllowHopperPickup(item, config)) {
                 return;
             }
 

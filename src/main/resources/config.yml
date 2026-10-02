@@ -1,20 +1,42 @@
 # Item-lock 全域設定檔
+# 註：個別保護樣品可在遊戲內輸入 /itemlock gui 自由獨立覆蓋以下全域開關設定。
 
 # 是否禁止按 Q 丟棄受保護物品
-deny-drop: true
+# 功能說明：禁止玩家按 Q 鍵或拖曳丟出此物品，防範意外掉落於世界中被其他玩家撿走。
+# 預設：false (關閉，允許丟棄)
+deny-drop: false
 
-# 是否禁止手持受保護物品右鍵非純容器方塊
+# 是否禁止將受保護物品放置在副手
+# 功能說明：封鎖 F 換手、基岩版 /geyser offhand 與副手槽放入，防範透過副手進行方塊偷放或違規交互。
+# 預設：false (關閉，允許副手)
+deny-offhand: false
+
+# 是否禁止將受保護方塊放置在世界上
+# 功能說明：禁止主手或副手將此上鎖物品作為方塊放置在世界上，避免具有方塊形態的貴重物品被放置化。
+# 預設：true (開啟，禁止放置方塊)
+deny-block-place: true
+
+# 是否禁止手持受保護物品右鍵非純容器方塊 (祭壇、機器、附魔台等)
+# 功能說明：禁止手持此物品右鍵附魔台、合成台、祭壇或自訂機械，防範物品被其他外掛的方塊轉化機制吞噬消耗。
+# 預設：true (開啟，防祭壇轉化與非容器交互)
 deny-altar-interact: true
 
 # 是否禁止將受保護物品放入展示框或盔甲架
-deny-entity-interact: true
+# 功能說明：禁止將此物品右鍵放入展示框或裝備在盔甲架上，防範被其他玩家利用實體漏洞或未受保區域取走。
+# 預設：false (關閉，允許放入展示框/盔甲架)
+deny-entity-interact: false
 
 # 漏斗物流管制設定
 hopper:
   # 是否允許漏斗抽取/傳送受保護物品
-  allow-move: false
+  # 功能說明：是否允許漏斗或漏斗礦車自容器中抽取並傳輸此物品，開啟時可進行自動化物流；關閉時杜絕漏斗吸取。
+  # 預設：true (開啟，允許漏斗抽取傳輸)
+  allow-move: true
+
   # 是否允許地面漏斗吸取掉落的受保護物品
-  allow-pickup: false
+  # 功能說明：是否允許地面上的漏斗直接吸取掉落在上方的此物品，開啟時支援掉落物收集；關閉時漏斗無法吸走。
+  # 預設：true (開啟，允許地面漏斗拾取)
+  allow-pickup: true
 
 # 掉落實體安全防護
 drop-protection:
@@ -66,12 +88,16 @@ messages:
   list-header: "<gold>===== [ 已登錄的保護物品樣本 (<count>) ] =====</gold>"
   list-item: "<yellow>- <gold><id></gold> (<white><material></white>)</yellow>"
   list-empty: "<gray>目前尚未登錄任何保護物品樣本。</gray>"
+  deny-offhand: "<red>⚠ 此物品受特殊保護，禁止放置在副手！</red>"
+  deny-block-place: "<red>⚠ 此物品受特殊保護，禁止作為方塊放置在世界上！</red>"
   help:
     - "<gold>================ [ Item-Lock 指令手冊 ] ================"
     - "<yellow>/itemlock help <gray>- 顯示指令說明手冊"
+    - "<yellow>/itemlock gui <gray>- 開啟保護物品樣本庫管理箱子介面 (54 格)"
+    - "<yellow>/itemlock list <gray>- 查看所有樣本（玩家執行將自動開啟箱子介面）"
+    - "<yellow>/itemlock edit <名稱> <gray>- 開啟指定樣本的個別屬性開關設定箱 (27 格)"
     - "<yellow>/itemlock add <名稱> [-f] <gray>- 將主手物品登錄為保護樣本 (-f 強制覆蓋)"
     - "<yellow>/itemlock remove <名稱> <gray>- 刪除指定的保護樣本"
-    - "<yellow>/itemlock check <gray>- 檢測主手物品是否受保護"
-    - "<yellow>/itemlock list <gray>- 列出所有已登錄的保護樣本"
+    - "<yellow>/itemlock check <gray>- 檢測主手物品是否受保護及匹配樣本名稱"
     - "<yellow>/itemlock reload <gray>- 重新載入設定檔與保護樣本庫"
     - "<gold>========================================================"

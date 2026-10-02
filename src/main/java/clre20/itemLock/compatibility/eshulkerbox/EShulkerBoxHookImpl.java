@@ -20,6 +20,7 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
     private Method isShulkerOpenMethod;
     private Method isReadOnlyMethod;
     private boolean reflectionReady = false;
+    private boolean loggedHook = false;
 
     public EShulkerBoxHookImpl() {
         initReflection();
@@ -39,7 +40,7 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
                 this.playersField = this.shulkerBoxMechanic.getClass().getDeclaredField("players");
                 this.playersField.setAccessible(true);
 
-                Class<?> playerModelClass = Class.forName("cz.esb.shulkerbox.mechanic.shulker.model.ShulkerPlayer");
+                Class<?> playerModelClass = plugin.getClass().getClassLoader().loadClass("cz.esb.shulkerbox.mechanic.shulker.model.ShulkerPlayer");
                 this.isShulkerOpenMethod = playerModelClass.getMethod("isShulkerOpen");
                 try {
                     this.isReadOnlyMethod = playerModelClass.getMethod("isReadOnly");
@@ -47,6 +48,10 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
                     this.isReadOnlyMethod = null;
                 }
                 this.reflectionReady = true;
+                if (!loggedHook) {
+                    loggedHook = true;
+                    Bukkit.getLogger().info("[Item-lock] 已成功動態掛接 eShulkerBox 插件！已啟用手持與背包快速開啟潛影盒相容支援。");
+                }
             }
         } catch (Throwable ignored) {
             this.reflectionReady = false;
@@ -70,8 +75,8 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
             return false;
         }
 
-        // eShulkerBox 手持開啟的介面，holder 與 location 皆為 null（非世界方塊實體）
-        if (topInventory.getHolder() != null || topInventory.getLocation() != null) {
+        // eShulkerBox 手持/隨身開啟的介面非世界方塊實體 (holder 非 BlockState 且 location == null)
+        if (topInventory.getHolder() instanceof org.bukkit.block.BlockState || topInventory.getLocation() != null) {
             return false;
         }
 
@@ -87,6 +92,14 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
                 Map<Player, ?> playersMap = (Map<Player, ?>) playersField.get(shulkerBoxMechanic);
                 if (playersMap != null) {
                     Object shulkerPlayer = playersMap.get(player);
+                    if (shulkerPlayer == null) {
+                        for (Map.Entry<Player, ?> entry : playersMap.entrySet()) {
+                            if (entry.getKey() != null && entry.getKey().getUniqueId().equals(player.getUniqueId())) {
+                                shulkerPlayer = entry.getValue();
+                                break;
+                            }
+                        }
+                    }
                     if (shulkerPlayer != null) {
                         boolean isOpen = (Boolean) isShulkerOpenMethod.invoke(shulkerPlayer);
                         if (isOpen) {

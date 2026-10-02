@@ -1,6 +1,7 @@
 package clre20.itemLock.template;
 
 import clre20.itemLock.model.ItemTemplate;
+import clre20.itemLock.model.TemplateSettings;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * 負責單檔物品樣本庫 (Per-Item YAML) 的載入、快取、保存與路徑安全檢驗。
@@ -84,7 +86,19 @@ public class TemplateManager {
     /**
      * 解析單一 YAML 樣本檔案。
      */
-    private ItemTemplate loadTemplateFile(File file) throws IOException {
+     private ItemTemplate loadTemplateFile(File file) throws IOException {
+        // 若檔案內殘留舊版的註解行，自動清除以保持檔案乾淨，避免每次都加上註解
+        try {
+            String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            if (content.contains("採用 Paper 原生二進位序列化") || content.contains("Data Components")) {
+                String cleaned = content.lines()
+                        .filter(line -> !line.contains("採用 Paper 原生二進位序列化") && !line.contains("Data Components"))
+                        .collect(Collectors.joining("\n")) + "\n";
+                Files.writeString(file.toPath(), cleaned, StandardCharsets.UTF_8);
+            }
+        } catch (Exception ignored) {
+        }
+
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         String id = config.getString("id");
         if (id == null || id.isBlank()) {
@@ -109,7 +123,9 @@ public class TemplateManager {
             material = itemStack.getType();
         }
 
-        return new ItemTemplate(id, createdAt, material, itemStack);
+        TemplateSettings settings = TemplateSettings.fromSection(config.getConfigurationSection("settings"));
+
+        return new ItemTemplate(id, createdAt, material, itemStack, settings);
     }
 
     /**
@@ -151,20 +167,77 @@ public class TemplateManager {
         byte[] serializedBytes = templateItem.serializeAsBytes();
         String base64 = Base64.getEncoder().encodeToString(serializedBytes);
 
-        String yamlContent = String.format(
-                "id: \"%s\"\n" +
-                "created-at: \"%s\"\n" +
-                "material: \"%s\"\n" +
-                "# 採用 Paper 原生二進位序列化 (完全保留 1.20.5+ 至 26.2 的所有 Data Components)\n" +
-                "data: \"%s\"\n",
-                id, now, material.name(), base64
-        );
+        // 若舊樣本已存在，繼承舊的個別設定；否則建立新預設設定
+        ItemTemplate existing = templateCache.get(id);
+        TemplateSettings settings = existing != null ? existing.getSettings() : new TemplateSettings();
 
-        Files.writeString(targetFile.toPath(), yamlContent, StandardCharsets.UTF_8);
+        YamlConfiguration config = new YamlConfiguration();
+        config.options().setHeader(Collections.emptyList());
+        config.options().setFooter(Collections.emptyList());
+        config.set("id", id);
+        config.set("created-at", now);
+        config.set("material", material.name());
+        config.set("data", base64);
+        Map<String, Object> settingsMap = settings.toMap();
+        if (!settingsMap.isEmpty()) {
+            config.createSection("settings", settingsMap);
+        }
+        config.save(targetFile);
 
-        ItemTemplate template = new ItemTemplate(id, now, material, templateItem);
+        cleanCommentLines(targetFile);
+
+        ItemTemplate template = new ItemTemplate(id, now, material, templateItem, settings);
         templateCache.put(id, template);
         return template;
+    }
+
+    /**
+     * 更新指定樣本的個別防護設定，並即時寫入檔案與快取。
+     */
+    public void updateTemplateSettings(String id, TemplateSettings settings) throws IOException {
+        ItemTemplate template = templateCache.get(id);
+        if (template == null) {
+            return;
+        }
+        template.setSettings(settings);
+
+        File targetFile = new File(templatesFolder, id + ".yml");
+        if (!targetFile.exists()) {
+            return;
+        }
+
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(targetFile);
+        config.options().setHeader(Collections.emptyList());
+        config.options().setFooter(Collections.emptyList());
+        config.setComments("data", Collections.emptyList());
+        config.setInlineComments("data", Collections.emptyList());
+        config.set("settings", null);
+        Map<String, Object> settingsMap = settings.toMap();
+        if (!settingsMap.isEmpty()) {
+            config.createSection("settings", settingsMap);
+        }
+        config.save(targetFile);
+
+        cleanCommentLines(targetFile);
+    }
+
+    /**
+     * 清理檔案中殘留的舊版註解行，確保保持乾淨的 YAML 結構。
+     */
+    private void cleanCommentLines(File file) {
+        try {
+            if (!file.exists()) {
+                return;
+            }
+            String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            if (content.contains("採用 Paper 原生二進位序列化") || content.contains("Data Components")) {
+                String cleaned = content.lines()
+                        .filter(line -> !line.contains("採用 Paper 原生二進位序列化") && !line.contains("Data Components"))
+                        .collect(Collectors.joining("\n")) + "\n";
+                Files.writeString(file.toPath(), cleaned, StandardCharsets.UTF_8);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     /**

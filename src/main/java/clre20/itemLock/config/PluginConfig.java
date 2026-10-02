@@ -20,6 +20,8 @@ public class PluginConfig {
     private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.legacyAmpersand();
 
     private boolean denyDrop;
+    private boolean denyOffhand;
+    private boolean denyBlockPlace;
     private boolean denyAltarInteract;
     private boolean denyEntityInteract;
 
@@ -60,6 +62,8 @@ public class PluginConfig {
     private String listHeader;
     private String listItem;
     private String listEmpty;
+    private String denyOffhandMessage;
+    private String denyBlockPlaceMessage;
     private List<String> helpMessages;
 
     public PluginConfig(Plugin plugin) {
@@ -76,12 +80,14 @@ public class PluginConfig {
         plugin.reloadConfig();
         FileConfiguration config = plugin.getConfig();
 
-        this.denyDrop = config.getBoolean("deny-drop", true);
+        this.denyDrop = config.getBoolean("deny-drop", false);
+        this.denyOffhand = config.getBoolean("deny-offhand", false);
+        this.denyBlockPlace = config.getBoolean("deny-block-place", true);
         this.denyAltarInteract = config.getBoolean("deny-altar-interact", true);
-        this.denyEntityInteract = config.getBoolean("deny-entity-interact", true);
+        this.denyEntityInteract = config.getBoolean("deny-entity-interact", false);
 
-        this.allowHopperMove = config.getBoolean("hopper.allow-move", false);
-        this.allowHopperPickup = config.getBoolean("hopper.allow-pickup", false);
+        this.allowHopperMove = config.getBoolean("hopper.allow-move", true);
+        this.allowHopperPickup = config.getBoolean("hopper.allow-pickup", true);
 
         this.preventDespawn = config.getBoolean("drop-protection.prevent-despawn", false);
 
@@ -138,18 +144,34 @@ public class PluginConfig {
                 "<yellow>- <gold><id></gold> (<white><material></white>)</yellow>");
         this.listEmpty = config.getString("messages.list-empty",
                 "<gray>目前尚未登錄任何保護物品樣本。</gray>");
-        this.helpMessages = config.getStringList("messages.help");
-        if (this.helpMessages.isEmpty()) {
+        this.denyOffhandMessage = config.getString("messages.deny-offhand",
+                "<red>⚠ 此物品受特殊保護，禁止放置在副手！</red>");
+        this.denyBlockPlaceMessage = config.getString("messages.deny-block-place",
+                "<red>⚠ 此物品受特殊保護，禁止作為方塊放置在世界上！</red>");
+        List<String> rawHelp = config.getStringList("messages.help");
+        List<String> filteredHelp = rawHelp.stream()
+                .filter(line -> !line.contains("※") && !line.contains("----------------"))
+                .toList();
+
+        boolean isMissingCommands = filteredHelp.isEmpty() ||
+                filteredHelp.stream().noneMatch(s -> s.contains("gui")) ||
+                filteredHelp.stream().noneMatch(s -> s.contains("edit"));
+
+        if (isMissingCommands) {
             this.helpMessages = List.of(
                     "<gold>================ [ Item-Lock 指令手冊 ] ================",
                     "<yellow>/itemlock help <gray>- 顯示指令說明手冊",
-                    "<yellow>/itemlock add <名稱> <gray>- 將主手物品登錄為保護樣本",
+                    "<yellow>/itemlock gui <gray>- 開啟保護物品樣本庫管理箱子介面 (54 格)",
+                    "<yellow>/itemlock list <gray>- 查看所有樣本（玩家執行將自動開啟箱子介面）",
+                    "<yellow>/itemlock edit <名稱> <gray>- 開啟指定樣本的個別屬性開關設定箱 (27 格)",
+                    "<yellow>/itemlock add <名稱> [-f] <gray>- 將主手物品登錄為保護樣本 (-f 強制覆蓋)",
                     "<yellow>/itemlock remove <名稱> <gray>- 刪除指定的保護樣本",
-                    "<yellow>/itemlock check <gray>- 檢測主手物品是否受保護",
-                    "<yellow>/itemlock list <gray>- 列出所有已登錄的保護樣本",
+                    "<yellow>/itemlock check <gray>- 檢測主手物品是否受保護及匹配樣本名稱",
                     "<yellow>/itemlock reload <gray>- 重新載入設定檔與保護樣本庫",
                     "<gold>========================================================"
             );
+        } else {
+            this.helpMessages = filteredHelp;
         }
     }
 
@@ -168,6 +190,22 @@ public class PluginConfig {
 
     public boolean isDenyDrop() {
         return denyDrop;
+    }
+
+    public boolean isDenyOffhand() {
+        return denyOffhand;
+    }
+
+    public boolean isDenyBlockPlace() {
+        return denyBlockPlace;
+    }
+
+    public String getDenyOffhandMessage() {
+        return denyOffhandMessage;
+    }
+
+    public String getDenyBlockPlaceMessage() {
+        return denyBlockPlaceMessage;
     }
 
     public boolean isDenyAltarInteract() {

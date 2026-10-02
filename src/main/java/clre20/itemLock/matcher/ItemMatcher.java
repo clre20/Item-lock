@@ -1,5 +1,6 @@
 package clre20.itemLock.matcher;
 
+import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.model.ItemTemplate;
 import clre20.itemLock.template.TemplateManager;
 import org.bukkit.Material;
@@ -12,6 +13,7 @@ import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.persistence.PersistentDataContainer;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -54,6 +56,44 @@ public class ItemMatcher {
         }
 
         return MatchResult.notMatched();
+    }
+
+    /**
+     * 尋找目標物品命中的保護樣本（若無命中則回傳 Optional.empty()）。
+     */
+    public Optional<ItemTemplate> findTemplate(ItemStack target) {
+        if (target == null || target.getType().isAir()) {
+            return Optional.empty();
+        }
+        return match(target).getTemplate();
+    }
+
+    public boolean isDenyDrop(ItemStack item, PluginConfig config) {
+        return findTemplate(item).map(t -> t.getSettings().isDenyDrop(config)).orElse(false);
+    }
+
+    public boolean isDenyOffhand(ItemStack item, PluginConfig config) {
+        return findTemplate(item).map(t -> t.getSettings().isDenyOffhand(config)).orElse(false);
+    }
+
+    public boolean isDenyBlockPlace(ItemStack item, PluginConfig config) {
+        return findTemplate(item).map(t -> t.getSettings().isDenyBlockPlace(config)).orElse(false);
+    }
+
+    public boolean isDenyAltarInteract(ItemStack item, PluginConfig config) {
+        return findTemplate(item).map(t -> t.getSettings().isDenyAltarInteract(config)).orElse(false);
+    }
+
+    public boolean isDenyEntityInteract(ItemStack item, PluginConfig config) {
+        return findTemplate(item).map(t -> t.getSettings().isDenyEntityInteract(config)).orElse(false);
+    }
+
+    public boolean isAllowHopperMove(ItemStack item, PluginConfig config) {
+        return findTemplate(item).map(t -> t.getSettings().isAllowHopperMove(config)).orElse(config.isAllowHopperMove());
+    }
+
+    public boolean isAllowHopperPickup(ItemStack item, PluginConfig config) {
+        return findTemplate(item).map(t -> t.getSettings().isAllowHopperPickup(config)).orElse(config.isAllowHopperPickup());
     }
 
     /**

@@ -88,7 +88,7 @@ public final class ContainerWhitelist {
             return false;
         }
         return inventory.getType() == InventoryType.SHULKER_BOX
-                && inventory.getHolder() == null
+                && !(inventory.getHolder() instanceof org.bukkit.block.BlockState)
                 && inventory.getLocation() == null;
     }
 

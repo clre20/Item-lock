@@ -5,7 +5,10 @@ import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.feedback.FeedbackService;
 import clre20.itemLock.matcher.ItemMatcher;
+import clre20.itemLock.ItemLock;
 import clre20.itemLock.security.ContainerWhitelist;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -17,6 +20,8 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+
+import java.util.Map;
 
 /**
  * 介面操作全管道封鎖監聽器 (Inventory Zero-Trust Security)。
@@ -56,6 +61,28 @@ public class InventorySecurityListener implements Listener {
             return;
         }
 
+        // 檢查副手槽位放入防護 (PlayerInventory Slot 40 或 CraftingView / Creative RawSlot 45)
+        if (isOffhandSlot(event)) {
+            ItemStack cursor = event.getCursor();
+            if (itemMatcher.isDenyOffhand(cursor, config)) {
+                cancelAndFeedback(event, player, config.getDenyOffhandMessage());
+                if (player.getGameMode() == GameMode.CREATIVE) {
+                    restoreCreativeItem(player, cursor);
+                }
+                return;
+            }
+            if (event.getClick() == ClickType.NUMBER_KEY) {
+                int hotbarSlot = event.getHotbarButton();
+                if (hotbarSlot >= 0 && hotbarSlot < 9) {
+                    ItemStack hotbarItem = player.getInventory().getItem(hotbarSlot);
+                    if (itemMatcher.isDenyOffhand(hotbarItem, config)) {
+                        cancelAndFeedback(event, player, config.getDenyOffhandMessage());
+                        return;
+                    }
+                }
+            }
+        }
+
         boolean isTopPureStorage = isPureStorage(player, topInventory);
         boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
 
@@ -72,6 +99,9 @@ public class InventorySecurityListener implements Listener {
                 ItemStack cursor = event.getCursor();
                 if (itemMatcher.isProtected(cursor)) {
                     cancelAndFeedback(event, player);
+                    if (player.getGameMode() == GameMode.CREATIVE) {
+                        restoreCreativeItem(player, cursor);
+                    }
                     return;
                 }
 
@@ -107,6 +137,14 @@ public class InventorySecurityListener implements Listener {
                         return;
                     }
                 }
+
+                // 防範透過 Shift-Click 將上鎖盾牌快捷穿戴入副手槽
+                if (current != null && current.getType() == org.bukkit.Material.SHIELD && itemMatcher.isDenyOffhand(current, config)) {
+                    if (player.getInventory().getItemInOffHand().getType().isAir()) {
+                        cancelAndFeedback(event, player, config.getDenyOffhandMessage());
+                        return;
+                    }
+                }
             }
 
             // 雙擊收集（DOUBLE_CLICK / COLLECT_TO_CURSOR）
@@ -132,6 +170,29 @@ public class InventorySecurityListener implements Listener {
         // 檢查是否處於允許的 Shopkeepers 介面中（交易或編輯介面）
         if (isShopkeepersAllowed(player, topInventory)) {
             return;
+        }
+
+        // 檢查拖曳是否涉及副手槽位
+        for (int rawSlot : event.getRawSlots()) {
+            if (isOffhandRawSlot(event.getView(), rawSlot)) {
+                ItemStack oldCursor = event.getOldCursor();
+                if (itemMatcher.isDenyOffhand(oldCursor, config)) {
+                    cancelAndFeedback(event, player, config.getDenyOffhandMessage());
+                    if (player.getGameMode() == GameMode.CREATIVE) {
+                        restoreCreativeItem(player, oldCursor);
+                    }
+                    return;
+                }
+                for (ItemStack newItem : event.getNewItems().values()) {
+                    if (itemMatcher.isDenyOffhand(newItem, config)) {
+                        cancelAndFeedback(event, player, config.getDenyOffhandMessage());
+                        if (player.getGameMode() == GameMode.CREATIVE) {
+                            restoreCreativeItem(player, oldCursor);
+                        }
+                        return;
+                    }
+                }
+            }
         }
 
         boolean isTopPureStorage = isPureStorage(player, topInventory);
@@ -168,6 +229,9 @@ public class InventorySecurityListener implements Listener {
                 }
                 // 拖拉塗抹涉及非純存儲頂部介面，立即取消
                 cancelAndFeedback(event, player);
+                if (player.getGameMode() == GameMode.CREATIVE) {
+                    restoreCreativeItem(player, oldCursor);
+                }
                 return;
             }
         }
@@ -177,7 +241,7 @@ public class InventorySecurityListener implements Listener {
      * 判定指定介面是否為純存儲容器（含真實方塊容器、末影箱、隨身背包及受相容的虛擬/手持潛影盒）。
      */
     private boolean isPureStorage(Player player, Inventory topInventory) {
-        if (ContainerWhitelist.isPureStorage(topInventory)) {
+        if (ContainerWhitelist.isPureStorage(topInventory, config.isAllowVirtualShulkerBox())) {
             return true;
         }
 
@@ -207,9 +271,72 @@ public class InventorySecurityListener implements Listener {
         return false;
     }
 
+    private boolean isOffhandSlot(InventoryClickEvent event) {
+        Inventory clicked = event.getClickedInventory();
+        if (clicked != null && clicked.getType() == InventoryType.PLAYER && event.getSlot() == 40) {
+            return true;
+        }
+        if (event.getSlot() == 40) {
+            return true;
+        }
+        // 在原版隨身 2x2 合成介面 (CraftingView) 或創造模式生存分頁中，副手槽為 rawSlot 45
+        int rawSlot = event.getRawSlot();
+        if (rawSlot == 45) {
+            InventoryType topType = event.getView().getTopInventory().getType();
+            if (topType == InventoryType.CRAFTING || topType == InventoryType.CREATIVE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isOffhandRawSlot(org.bukkit.inventory.InventoryView view, int rawSlot) {
+        InventoryType topType = view.getTopInventory().getType();
+        if ((topType == InventoryType.CRAFTING || topType == InventoryType.CREATIVE) && rawSlot == 45) {
+            return true;
+        }
+        int topSize = view.getTopInventory().getSize();
+        if (rawSlot >= topSize) {
+            int slotInBottom = view.convertSlot(rawSlot);
+            if (slotInBottom == 40) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 創造模式專屬防遺失返還機制：
+     * 在創造模式下，客戶端在拖曳/點擊被伺服端取消時會自動抹除游標物品且不接收游標同步封包，
+     * 因此透過排程在下一個 Tick 將物品安全歸還至玩家主背包或快捷欄，若背包滿則安全掉落在腳下。
+     */
+    private void restoreCreativeItem(Player player, ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return;
+        }
+        ItemStack restoreItem = item.clone();
+        Bukkit.getScheduler().runTask(ItemLock.getInstance(), () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            player.setItemOnCursor(null);
+            Map<Integer, ItemStack> leftover = player.getInventory().addItem(restoreItem);
+            if (!leftover.isEmpty()) {
+                for (ItemStack drop : leftover.values()) {
+                    player.getWorld().dropItem(player.getLocation(), drop);
+                }
+            }
+            player.updateInventory();
+        });
+    }
+
     private void cancelAndFeedback(org.bukkit.event.Cancellable event, Player player) {
+        cancelAndFeedback(event, player, null);
+    }
+
+    private void cancelAndFeedback(org.bukkit.event.Cancellable event, Player player, String customMessage) {
         event.setCancelled(true);
-        feedbackService.sendDenyFeedback(player);
+        feedbackService.sendDenyFeedback(player, customMessage);
         feedbackService.syncInventoryNextTick(player);
     }
 }

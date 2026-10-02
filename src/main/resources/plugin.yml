@@ -11,7 +11,7 @@ commands:
   itemlock:
     description: Item-lock 主管理指令
     permission: itemlock.admin
-    usage: /itemlock [help|add|remove|check|list|reload]
+    usage: /itemlock [help|add|remove|check|list|gui|edit|reload]
 
 permissions:
   itemlock.admin:

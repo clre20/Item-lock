@@ -26,9 +26,16 @@ public class FeedbackService {
     }
 
     /**
-     * 當操作被拒絕時，觸發警示回饋（受冷卻時間限制）。
+     * 當操作被拒絕時，觸發警示回饋（使用預設訊息）。
      */
     public void sendDenyFeedback(Player player) {
+        sendDenyFeedback(player, null);
+    }
+
+    /**
+     * 當操作被拒絕時，觸發警示回饋（使用自訂訊息）。
+     */
+    public void sendDenyFeedback(Player player, String customMessage) {
         if (player == null || !player.isOnline()) {
             return;
         }
@@ -44,7 +51,8 @@ public class FeedbackService {
 
         // Actionbar 警示
         if (config.isActionbarEnabled()) {
-            Component message = config.parseComponent(config.getActionbarMessage());
+            String msg = (customMessage != null && !customMessage.isBlank()) ? customMessage : config.getActionbarMessage();
+            Component message = config.parseComponent(msg);
             player.sendActionBar(message);
         }
 

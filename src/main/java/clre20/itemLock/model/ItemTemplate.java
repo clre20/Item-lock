@@ -14,12 +14,18 @@ public class ItemTemplate {
     private final String createdAt;
     private final Material material;
     private final ItemStack itemStack;
+    private TemplateSettings settings;
 
     public ItemTemplate(String id, String createdAt, Material material, ItemStack itemStack) {
+        this(id, createdAt, material, itemStack, new TemplateSettings());
+    }
+
+    public ItemTemplate(String id, String createdAt, Material material, ItemStack itemStack, TemplateSettings settings) {
         this.id = Objects.requireNonNull(id, "id cannot be null");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt cannot be null");
         this.material = Objects.requireNonNull(material, "material cannot be null");
         this.itemStack = Objects.requireNonNull(itemStack, "itemStack cannot be null");
+        this.settings = settings != null ? settings : new TemplateSettings();
     }
 
     public String getId() {
@@ -36,5 +42,13 @@ public class ItemTemplate {
 
     public ItemStack getItemStack() {
         return itemStack.clone();
+    }
+
+    public TemplateSettings getSettings() {
+        return settings;
+    }
+
+    public void setSettings(TemplateSettings settings) {
+        this.settings = settings != null ? settings : new TemplateSettings();
     }
 }

@@ -41,15 +41,6 @@ public interface ShopkeepersHook {
      * 工廠方法：若伺服器已載入 Shopkeepers 則建立專用 Hook，否則回傳 No-op 實作。
      */
     static ShopkeepersHook create() {
-        if (Bukkit.getPluginManager().isPluginEnabled("Shopkeepers")) {
-            try {
-                Class.forName("com.nisovin.shopkeepers.api.ShopkeepersAPI");
-                if (com.nisovin.shopkeepers.api.ShopkeepersAPI.isEnabled()) {
-                    return new ShopkeepersHookImpl();
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-        return new NoOpShopkeepersHook();
+        return new DynamicShopkeepersHook();
     }
 }

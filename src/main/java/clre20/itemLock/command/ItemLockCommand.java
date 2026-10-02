@@ -51,6 +51,8 @@ public class ItemLockCommand implements CommandExecutor {
             case "remove" -> handleRemove(sender, args);
             case "check" -> handleCheck(sender);
             case "list" -> handleList(sender);
+            case "gui" -> handleGui(sender);
+            case "edit" -> handleEdit(sender, args);
             case "reload" -> handleReload(sender);
             default -> {
                 sendMessage(sender, "<red>未知的子指令！請使用 <yellow>/" + label + " help</yellow> 查看說明。</red>");
@@ -156,6 +158,11 @@ public class ItemLockCommand implements CommandExecutor {
     }
 
     private void handleList(CommandSender sender) {
+        if (sender instanceof Player player) {
+            new clre20.itemLock.gui.TemplateListGui(templateManager, config, 0).open(player);
+            return;
+        }
+
         Map<String, ItemTemplate> templates = templateManager.getAllTemplates();
         if (templates.isEmpty()) {
             sendMessage(sender, config.getListEmpty());
@@ -165,7 +172,6 @@ public class ItemLockCommand implements CommandExecutor {
         String header = config.getListHeader().replace("<count>", String.valueOf(templates.size()));
         sendMessage(sender, header);
 
-        File folder = templateManager.getTemplatesFolder();
         for (ItemTemplate template : templates.values()) {
             String fileName = template.getId() + ".yml";
             String itemLine = config.getListItem()
@@ -174,6 +180,35 @@ public class ItemLockCommand implements CommandExecutor {
                     .replace("<file>", fileName);
             sendMessage(sender, itemLine);
         }
+    }
+
+    private void handleGui(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sendMessage(sender, config.getPlayerOnly());
+            return;
+        }
+        new clre20.itemLock.gui.TemplateListGui(templateManager, config, 0).open(player);
+    }
+
+    private void handleEdit(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sendMessage(sender, config.getPlayerOnly());
+            return;
+        }
+
+        if (args.length < 2) {
+            sendMessage(sender, "<red>請指定要編輯的樣本名稱！用法: <yellow>/itemlock edit <名稱></yellow></red>");
+            return;
+        }
+
+        String name = args[1];
+        var opt = templateManager.getTemplate(name);
+        if (opt.isEmpty()) {
+            sendMessage(sender, config.getRemoveNotFound().replace("<id>", name));
+            return;
+        }
+
+        new clre20.itemLock.gui.TemplateSettingsGui(templateManager, config, opt.get(), 0).open(player);
     }
 
     private void handleReload(CommandSender sender) {

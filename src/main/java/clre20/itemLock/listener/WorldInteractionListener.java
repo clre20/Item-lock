@@ -68,7 +68,7 @@ public class WorldInteractionListener implements Listener {
             return;
         }
 
-        if (config.isDenyAltarInteract()) {
+        if (itemMatcher.isDenyAltarInteract(item, config)) {
             // 若點擊的不是純存儲容器方塊（如祭壇、大鍋、合成台、附魔台、研磨石、鐵砧等）
             if (!ContainerWhitelist.isPureStorageBlock(clickedBlock)) {
                 event.setCancelled(true);
@@ -83,15 +83,11 @@ public class WorldInteractionListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
-        if (!config.isDenyEntityInteract()) {
-            return;
-        }
-
         Player player = event.getPlayer();
         ItemStack mainHand = player.getInventory().getItemInMainHand();
         ItemStack offHand = player.getInventory().getItemInOffHand();
 
-        boolean holdingProtected = itemMatcher.isProtected(mainHand) || itemMatcher.isProtected(offHand);
+        boolean holdingProtected = itemMatcher.isDenyEntityInteract(mainHand, config) || itemMatcher.isDenyEntityInteract(offHand, config);
         if (!holdingProtected) {
             return;
         }
@@ -115,12 +111,8 @@ public class WorldInteractionListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerDropItem(PlayerDropItemEvent event) {
-        if (!config.isDenyDrop()) {
-            return;
-        }
-
         ItemStack dropped = event.getItemDrop().getItemStack();
-        if (itemMatcher.isProtected(dropped)) {
+        if (itemMatcher.isDenyDrop(dropped, config)) {
             event.setCancelled(true);
             Player player = event.getPlayer();
             feedbackService.sendDenyFeedback(player);

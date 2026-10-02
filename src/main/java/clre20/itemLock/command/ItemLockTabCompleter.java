@@ -21,7 +21,7 @@ import java.util.Locale;
  */
 public class ItemLockTabCompleter implements TabCompleter {
 
-    private static final List<String> SUB_COMMANDS = List.of("help", "add", "remove", "check", "list", "reload");
+    private static final List<String> SUB_COMMANDS = List.of("help", "add", "remove", "check", "list", "gui", "edit", "reload");
 
     private final TemplateManager templateManager;
 
@@ -48,7 +48,7 @@ public class ItemLockTabCompleter implements TabCompleter {
         if (args.length == 2) {
             String subCommand = args[0].toLowerCase(Locale.ROOT);
             switch (subCommand) {
-                case "remove" -> {
+                case "remove", "edit" -> {
                     // 自動補齊所有已登錄的範本名稱
                     List<String> templateIds = new ArrayList<>(templateManager.getAllTemplates().keySet());
                     StringUtil.copyPartialMatches(args[1], templateIds, completions);
