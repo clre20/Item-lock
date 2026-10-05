@@ -1,258 +1,121 @@
 # Item-lock
 
-Item-lock 是一款針對 Minecraft Paper 及 Purpur 伺服器端（相容 Minecraft 1.20.5 至 1.21.x 最新版本）設計的高安全性物品保護與防竄改系統。本系統捨棄傳統易遺漏的黑名單機制，採用「零信任容器安全網」與「動態遮罩特徵比對引擎」，徹底阻斷原版與第三方插件介面對受保護物品的非法修改、加工、複製與轉換。
+---
+
+Item-lock 是一款針對 Minecraft Paper 及 Purpur 伺服器端（1.21+）設計的物品保護插件。透過純存儲容器白名單與動態組件比對，防止伺服器特殊物品（如任務道具、自訂裝備、代幣貨幣）在未經授權的介面中遭到修改、附魔、加工、複製或意外丟失。
+
+### 主要功能
+
+* **動態組件特徵比對**
+  * **材質過濾**：以物品材質進行快速初篩；針對已繪製地圖（`FILLED_MAP`）精準比對內部 `map_id`。
+  * **動態數值遮罩**：比對時自動屏蔽遊戲常態變動數值（將耐久消耗 `damage` 與鐵砧修復懲罰 `repair_cost` 歸零後再比對），確保物品磨損或維修後仍能正常匹配。
+  * **特徵指紋驗證**：比對 Custom Model Data、自訂名稱、Lore、附魔列表與 Persistent Data Container (PDC) 標籤。
+
+* **純存儲容器白名單防護**
+  * 僅允許受保護物品存放在以下純儲存用途之容器：
+    * 箱子、雙箱、陷阱箱（限世界真實方塊實體）
+    * 木桶
+    * 潛影盒（已放置之方塊，或設定放行之虛擬潛影盒）
+    * 末影箱
+    * 玩家自身背包
+  * 當玩家開啟非白名單介面（如鐵砧、砂輪、鐵匠台、製圖台、熔爐，以及各類非純存儲的外掛自訂介面）時，攔截滑鼠放置、Shift 快速移入、數字鍵置換與滑鼠拖曳塗抹操作。
+
+* **遊戲內 GUI 管理系統 (v2.1+)**
+  * **樣本庫瀏覽介面 (`/itemlock gui` 或 `/itemlock list`)**：54 格分頁箱子介面，清楚陳列所有已註冊的保護物品、材質與個別防護開關摘要。
+  * **個別樣本設定介面 (`/itemlock edit <名稱>`)**：27 格箱子介面，管理員可自由針對單一物品調整各項防護開關（三態切換：繼承全域 / 強制開啟 / 強制關閉），並支援取得樣本副本或刪除樣本。
+
+* **副手與世界互動安全**
+  * **副手防護**：攔截 F 換手、基岩版 `/geyser offhand` 指令與背包副手槽移入。若因未知途徑殘留於副手，系統將在切換手持或關閉介面時自動移回主背包。
+  * **方塊防放**：禁止玩家將受保護的方塊類物品作為方塊放置到世界上。
+  * **合成防拓印**：當 3x3 工作台或 2x2 隨身合成矩陣中包含受保護物品時，自動清空合成產物並取消事件，防止地圖複製或配方加工。
+  * **非容器方塊交互防護**：手持受保護物品右鍵非純存儲方塊（如祭壇、大鍋、附魔台）時取消交互。
+  * **實體交互防護**：禁止將受保護物品放入展示框、發光展示框或裝備在盔甲架上。
+  * **丟棄防護**：可選開啟禁止按 Q 丟棄。掉落實體生成時自動賦予火焰、岩漿、爆炸傷害免疫，並禁止生物拾取。
+
+* **自動化物流管制**
+  * 支援獨立設定是否允許漏斗或漏斗礦車自容器中抽取並傳輸受保護物品，以及地面漏斗是否可吸取掉落的受保護物品。
+
+* **第三方外掛相容支援**
+  * **Shopkeepers**：原生支援村民商店，允許受保護物品作為貨幣或商品交易，並支援在店主設定介面中進行配方配置。
+  * **eShulkerBox**：支援在手持或隨身開啟的潛影盒介面中安全存取受保護物品。
+
+* **防幽靈物品與操作反饋**
+  * 攔截操作時於螢幕正下方顯示 Actionbar 提示並播放拒絕音效（具備冷卻防刷保護）。
+  * 攔截後於下 1 個 Tick 自動排程執行 `player.updateInventory()`，強制對齊伺服器與客戶端數據，消除幽靈物品。
 
 ---
 
-## 核心架構與儲存設計
+### 指令與權限說明
 
-### 單檔樣本獨立儲存
-系統全面採用單檔獨立配置設計，便於伺服器管理員針對個別樣本進行備份、版本控管與跨伺服器轉移：
+權限節點：`itemlock.admin`（預設為 OP Level 2）
 
-```text
-plugins/Item-lock/
-├── config.yml              # 全域參數 (提示字詞、音效開關、漏斗與丟棄原則)
-└── templates/              # 保護物品樣本目錄 (每個物品對應單一 YAML 檔案)
-    ├── dragon_sword.yml    # 範例：特定裝備保護配置
-    └── secret_map.yml      # 範例：核心地圖配置
-```
-
-* **原生二進位序列化**：樣本資料透過 Paper 原生 `ItemStack.serializeAsBytes()` 結合 Base64 儲存，完整保留 1.20.5+ 引入的全部 Data Components，包含自定義模型資料（Custom Model Data）、附魔標籤、屬性修飾符與 PersistentDataContainer（PDC）。
-* **零磁碟延遲快取**：伺服器開機或執行重新載入時，系統遍歷 `templates/*.yml` 載入記憶體快取。遊戲內的即時安全比對全數於記憶體內完成，主執行緒不產生任何磁碟 I/O。
-* **路徑安全性校驗**：樣本名稱嚴格限制僅能使用英數字、底線與連字符（正則規範：`^[a-zA-Z0-9_-]+$`），杜絕目錄遍歷（Directory Traversal）漏洞。
-* **覆蓋防呆機制**：若嘗試登錄已存在的樣本名稱，系統會主動攔截並要求附帶強制覆蓋參數 `-f`，防止管理員因暫用命名不慎沖掉既有配置。
-
----
-
-## 智慧遮罩比對引擎
-
-為避免玩家在正常遊戲行為中因物品磨損或維修而導致保護失效，比對引擎採三層式過濾機制：
-
-1. **第一層：材質初篩**
-   * 優先比對物品 `Material`。若材質不一致，直接於單一運算週期剔除，大幅降低後續運算負擔。
-
-2. **第二層：動態組件遮罩**
-   * 自動屏蔽正常遊戲過程中會動態變動的組件數值：
-     * 排除 `minecraft:damage`：耐久度耗損不影響保護判定。
-     * 排除 `minecraft:repair_cost`：鐵砧使用累積的修復懲罰不影響判定。
-
-3. **第三層：特徵指紋比對**
-   * **武器與一般裝備**：比對 `custom_model_data`、`custom_name` / `item_name`、`lore`、`enchantments` 映射表及持久化標籤（PersistentDataContainer, PDC），並驗證其餘靜態組件完全一致。
-   * **已繪製地圖**：精確比對核心組件 `minecraft:map_id`。只要 Map ID 與母本一致即判定命中。
-
----
-
-## 零信任安全攔截網
-
-系統不依賴第三方插件黑名單，全數採用白名單存儲容器原則：
-
-### 純存儲白名單容器
-僅允許以下純存放用途之容器：
-* 箱子、雙箱、陷阱箱（`Chest` / `DoubleChest`，限真實世界方塊）
-* 木桶（`Barrel`）
-* 潛影盒（`Shulker Box`）
-* 末影箱（`Ender Chest`）
-* 玩家自身背包（`PlayerInventory`）
-
-### 介面操作全管道封鎖
-若玩家開啟的頂部介面不在白名單內（包含鐵砧、砂輪、鐵匠台、製圖台、熔爐，以及 Slimefun、自定義強化台等虛擬 GUI）：
-* **滑鼠游標放入**：取消事件，禁止將保護物品放入非白名單介面槽位。
-* **Shift 快速移入**：取消事件，禁止自背包快速傳送進入非白名單介面。
-* **數字鍵偷換**：取消事件，禁止透過快捷列快捷鍵進行物品置換。
-* **滑鼠拖拉塗抹**：取消事件，禁止以游標拖曳將物品劃入非白名單槽位。
-
-### 工作台與隨身 2x2 合成防拓印
-* 監聽 `PrepareItemCraftEvent` 與 `CraftItemEvent`。
-* 檢查 3x3 工作台以及玩家隨身背包的 2x2 合成矩陣。若合成槽內包含任何受保護的物品或地圖，直接將合成產物清空為 null 並取消合成事件，封死原版地圖拓印與所有配方合成。
-
-### 自動化物流管制 (Hopper & Logistics)
-* 監聽 `InventoryMoveItemEvent`：若移動對象為受保護物品，且目標容器非純存儲白名單容器，一律取消移動。
-* 監聽 `InventoryPickupItemEvent`：防止地面漏斗將受保護物品吸入自動化管線。
-* 可透過 `config.yml` 獨立開關是否允許漏斗移動 (`allow-move`) 與地面吸取 (`allow-pickup`)。
-
-### 世界互動與掉落防護
-* **防祭壇方塊轉換**：手持受保護物品右鍵非純容器方塊時取消交互，防止觸發多方塊機器或儀式轉化。
-* **展示框防塞入**：手持受保護物品右鍵點擊物品展示框或盔甲架時取消交互。
-* **防 Q 丟棄**：可於設定檔啟用 `deny-drop: true` 禁止丟出。
-* **掉落物免疫機制**：若設定允許丟出，掉落實體生成時自動賦予無敵屬性，免疫火焰、熔岩、爆炸與實體受傷；禁止生物（如殭屍、豬靈）拾取。
-* **原版 `/give` 動畫假物品清理**：精準識別指令方塊與原版 `/give` 產生的拾取動畫假實體（`makeFakeItem`），於動畫結束時自動清理，防止在地面產生無法拾取的殘留物。
-
----
-
-## 第三方插件相容支援
-
-### Shopkeepers 村民商店
-本插件深度相容 [Shopkeepers](https://www.spigotmc.org/resources/shopkeepers.80756/) 村民商店插件，允許受保護物品作為商店交易道具或貨幣使用：
-
-* **交易介面相容**：
-  * 開啟 Shopkeepers 村民交易視窗時，允許玩家使用受保護物品作為貨幣支付放入交易槽。
-  * 允許玩家從交易產物槽安全領取受保護物品。
-* **設定與編輯介面相容**：
-  * 店主或管理員於 Shopkeepers 編輯介面中，可自由放入、設定或更換包含保護物品在內的交易公式配方。
-* **實體與方塊辨識**：
-  * 自動辨識 Shopkeeper 實體（含盔甲架型態店主）與方塊（告示牌商店），手持受保護物品右鍵店主時正常開啟商店介面，不予誤攔截。
-* 可於 `config.yml` 透過 `compatibility.shopkeepers.allow-trading` 與 `allow-editor` 分別進行獨立開關控制。
-
-### eShulkerBox 手持潛影盒
-本插件深度相容 [eShulkerBox](https://modrinth.com/plugin/eshulkerbox) 手持/隨身開啟潛影盒插件：
-
-* **手持與空氣開啟介面支援**：
-  * 支援玩家手持潛影盒右鍵空氣或隨身開啟時，在虛擬潛影盒介面中自由存入與取出受保護物品。
-  * 完整支援滑鼠點擊取放、Shift 快速移入、數字鍵交換及滑鼠拖拉塗抹等全管道操作。
-* **零信任安全機制無損**：
-  * 透過底層動態反射與介面特徵檢驗雙重過濾，僅對純存儲用途之潛影盒介面放行，其餘非存儲自定義加工 GUI 與強化台依然維持嚴格攔截。
-* 可於 `config.yml` 透過 `compatibility.eshulkerbox.allow-handheld-shulkerbox` 進行獨立開關控制。
-
----
-
-## 防幽靈物品與操作回饋
-
-* **Tick 延遲同步**：當違規操作被取消時，排程於下 1 個 Tick 對玩家執行 `player.updateInventory()`，強制對齊伺服器與客戶端數據，杜絕客戶端預測產生的幽靈物品現象。
-* **Actionbar 警示**：透過 Adventure API 於玩家螢幕正下方顯示警示訊息。
-* **音效打擊反饋**：播放原版拒絕音效（例如 `ENTITY_VILLAGER_NO`）。
-* **冷卻防刷 **：以暫態 UUID 時間戳記錄警示觸發時機，將提示與音效限制為每秒最多觸發一次，避免連點造成干擾。
-
----
-
-## 指令與權限說明
-
-全指令皆要求權限節點 `itemlock.admin`（預設為 OP Level 2）：
-
-| 指令語法 | 參數說明 | 說明 |
+| 指令語法 | 參數說明 | 功能說明 |
 | :--- | :--- | :--- |
-| `/itemlock help` | 無 | 顯示結構化指令說明手冊。 |
-| `/itemlock add <名稱> [-f]` | 樣本名稱 (可選 `-f`) | 採樣主手物品並將耐久與修復成本歸零後儲存。若名稱已存在需附帶 `-f` 強制覆蓋。 |
-| `/itemlock remove <名稱>` | 已存在的樣本名稱 | 刪除實體檔案並從記憶體快取中移除。 |
-| `/itemlock check` | 無 | 檢測當前手持物品是否受保護，並顯示匹配的樣本名稱。 |
-| `/itemlock list` | 無 | 列出所有已登錄的樣本名稱、對應檔案與物品材質。 |
-| `/itemlock reload` | 無 | 清空快取、重新掃描並載入樣本檔案與全域設定。 |
-| `/itemlock gui` | 無 | 開啟選單可配置每種物品的權限。 |
-
-# Item-lock
-
-Item-lock is a high-security item protection and anti-tamper system designed for Minecraft Paper and Purpur servers (compatible with Minecraft 1.20.5 through the latest 1.21.x releases). Bypassing error-prone blacklists, it leverages a "Zero-Trust Container Safety Net" alongside a "Dynamic Mask Feature Comparison Engine" to completely block illicit modifications, processing, duplications, and conversions across vanilla mechanics and third-party plugin interfaces.
+| `/itemlock help` | 無 | 顯示指令說明手冊。 |
+| `/itemlock gui` | 無 | 開啟 54 格保護物品樣本庫管理箱介面。 |
+| `/itemlock list` | 無 | 查看所有已註冊的保護樣本（玩家執行將自動開啟 GUI；主控台顯示文字列表）。 |
+| `/itemlock edit <名稱>` | 樣本名稱 | 開啟指定樣本的 27 格個別屬性設定介面。 |
+| `/itemlock add <名稱> [-f]` | 樣本名稱 (可選 `-f`) | 將主手手持物品註冊為保護樣本（耐久與修復懲罰自動正規化）。已存在時需加上 `-f` 強制覆蓋。 |
+| `/itemlock remove <名稱>` | 已存在的樣本名稱 | 自磁碟檔案與記憶體快取中刪除指定樣本。 |
+| `/itemlock check` | 無 | 檢測主手物品是否受保護，並顯示所匹配的樣本名稱。 |
+| `/itemlock reload` | 無 | 重新載入全域設定檔與所有樣本檔案至記憶體快取。 |
 
 ---
 
-## Core Architecture & Storage Design
+## English
 
-### Individual Template Storage
-The system uses a standalone file layout per template, streamlining backups, version control, and cross-server transfers:
+Item-lock is an item protection plugin for Paper and Purpur Minecraft servers (1.21+). It protects designated items (such as unique quest items, RPG gear, or custom currency) from accidental loss, unauthorized modification, crafting, and grinding by restricting interactions to whitelisted storage containers.
 
-```text
-plugins/Item-lock/
-├── config.yml              # Global settings (messages, sound toggles, hopper & drop rules)
-└── templates/              # Protected item templates (one YAML per template)
-    ├── dragon_sword.yml    # Example: custom gear protection
-    └── secret_map.yml      # Example: core map configuration
-```
+### Key Features
 
-* **Native Binary Serialization**: Template data is stored using Paper's native `ItemStack.serializeAsBytes()` combined with Base64, preserving all Data Components introduced in 1.20.5+ (Custom Model Data, enchantments, attribute modifiers, and PersistentDataContainers).
-* **Zero Disk-I/O In-Game**: Templates in `templates/*.yml` load into memory at boot and during reload. All real-time checks run strictly in-memory without blocking the main server thread with disk operations.
-* **Path Traversal Sanitization**: Template names strictly accept alphanumeric characters, underscores, and hyphens (`^[a-zA-Z0-9_-]+$`) to prevent directory traversal exploits.
-* **Overwrite Guard**: Attempting to register an existing template name is blocked unless explicitly overridden with the `-f` flag.
+* **Component-Aware Item Matching**
+  * **Material Filter**: Fast preliminary check by item material. Filled maps (`FILLED_MAP`) are matched by their internal `map_id`.
+  * **Dynamic Masking**: Normalizes gameplay wear components (resets `minecraft:damage` and anvil `minecraft:repair_cost` during comparison), ensuring used or repaired items remain protected.
+  * **Fingerprint Verification**: Compares Custom Model Data, display name, lore, enchantments, and Persistent Data Container (PDC) tags.
 
----
+* **Storage Whitelist Container Safety**
+  * Restricts protected item transfers strictly to pure storage blocks:
+    * Chests, Trapped Chests, and Double Chests (physical world blocks only)
+    * Barrels
+    * Shulker Boxes (placed physical blocks, or whitelisted virtual menus)
+    * Ender Chests
+    * Player Inventory
+  * Prevents depositing protected items into non-storage interfaces (such as anvils, grindstones, smithing tables, cartography tables, furnaces, or unauthorized custom plugin menus) via clicking, shift-clicking, hotbar number keys, or drag-painting.
 
-## Dynamic Mask Comparison Engine
+* **In-Game GUI Management (v2.1+)**
+  * **Template Browser (`/itemlock gui` or `/itemlock list`)**: A 54-slot paginated chest GUI displaying all registered templates, their materials, and active protection toggles.
+  * **Per-Item Settings (`/itemlock edit <id>`)**: A 27-slot chest GUI allowing administrators to adjust individual protection settings using tri-state toggles (Inherit Global / Enforce True / Enforce False), acquire a duplicate sample item, or safely delete a template.
 
-To prevent normal gameplay wear, tears, and maintenance from voiding item protection, the engine uses a 3-layer filter:
+* **Offhand & World Interaction Safeguards**
+  * **Offhand Restriction**: Prevents moving protected items to the offhand slot via keybinds (F key), Bedrock `/geyser offhand` commands, or shift-clicking. Automatically returns residual offhand items to the main inventory.
+  * **Block Placement Guard**: Prevents players from placing protected block-type items into the physical world.
+  * **Crafting Protection**: Clears the output and cancels crafting if a protected item is placed inside a 3x3 crafting table or 2x2 player inventory grid (prevents vanilla map cloning and recipes).
+  * **Non-Storage Block Interaction**: Cancels right-click interactions on non-storage blocks (e.g. cauldrons, enchanting tables) while holding protected items.
+  * **Entity Interaction**: Prevents inserting protected items into item frames, glowing item frames, or armor stands.
+  * **Drop Protection**: Optional toggle to prevent dropping via the Q key. Dropped entities receive immunity against fire, lava, explosions, and mob pickup.
 
-1. **Layer 1: Material Check**
-   * Validates the item's `Material`. Mismatches are rejected in a single cycle, eliminating unneeded overhead.
+* **Logistics & Hoppers**
+  * Configurable controls for hoppers and hopper minecarts to allow or prevent transferring (`hopper.allow-move`) and picking up (`hopper.allow-pickup`) protected items.
 
-2. **Layer 2: Dynamic Component Masking**
-   * Masks out fluid gameplay components during checks:
-     * Ignores `minecraft:damage`: Durability loss will not bypass protection.
-     * Ignores `minecraft:repair_cost`: Accumulated anvil repair penalties will not bypass protection.
+* **Third-Party Compatibility**
+  * **Shopkeepers**: Built-in support allowing protected items to be used as trading currency or items, and allowing configuration in the Shopkeepers editor menu.
+  * **eShulkerBox**: Allows storing and retrieving protected items within handheld or virtual shulker box interfaces.
 
-3. **Layer 3: Fingerprint Matching**
-   * **Weapons & Standard Equipment**: Matches `custom_model_data`, `custom_name` / `item_name`, `lore`, `enchantments`, and the PersistentDataContainer (PDC), verifying that all other static components match precisely.
-   * **Filled Maps**: Matches the core `minecraft:map_id` component. Matches are triggered if the Map ID aligns with the master template.
+* **Player Feedback & Anti-Desync**
+  * Displays Actionbar notifications and plays refusal sounds when an illegal action is blocked.
+  * Automatically schedules `player.updateInventory()` on the next tick to prevent client-side ghost item desynchronization.
 
----
+### Commands & Permissions
 
-## Zero-Trust Security Interception
-
-The plugin discards fragile third-party blocklists, enforcing a strict whitelist for storage containers.
-
-### Storage Whitelist Containers
-Access is restricted strictly to pure storage blocks:
-* Chests, Double Chests, Trapped Chests (`Chest` / `DoubleChest`, physical world blocks only)
-* Barrels (`Barrel`)
-* Shulker Boxes (`Shulker Box`)
-* Ender Chests (`Ender Chest`)
-* Player inventory (`PlayerInventory`)
-
-### Comprehensive GUI Pipeline Blockade
-If an opened top inventory falls outside the whitelist (e.g., anvils, grindstones, smithing tables, cartography tables, furnaces, or virtual menus such as Slimefun workbenches):
-* **Cursor Placement**: Cancels events moving protected items into unauthorized slots.
-* **Shift-Click Transfers**: Blocks rapid transfers from the player inventory into forbidden interfaces.
-* **Hotbar Swapping**: Blocks number-key slot swaps.
-* **Mouse Dragging / Painting**: Prevents painting or distributing items across non-whitelisted slots.
-
-### Crafting Grid & Map Cloning Prevention
-* Hooks into `PrepareItemCraftEvent` and `CraftItemEvent`.
-* Scans both 3x3 crafting tables and 2x2 player inventory grids. If any protected item or map enters the matrix, the recipe output is cleared to `null` and the event is cancelled, shutting down vanilla map cloning and crafting exploits.
-
-### Hopper & Automation Logistics
-* Listens to `InventoryMoveItemEvent`: Cancels item transfers if the item is protected and the destination is not an approved storage container.
-* Listens to `InventoryPickupItemEvent`: Prevents hoppers from vacuuming protected items off the floor.
-* Configurable via `config.yml` with toggles for hopper transfers (`allow-move`) and hopper pickups (`allow-pickup`).
-
-### World Interactions & Drop Protections
-* **Altar Block Conversion Prevention**: Cancels right-click interactions on non-storage blocks when holding protected items, preventing multi-block machine triggers or ritual sacrifices.
-* **Item Frame Protection**: Cancels right-clicks targeting item frames and armor stands while holding protected items.
-* **Drop Prevention**: Dropping items via the drop key (Q) can be locked down via `deny-drop: true`.
-* **Entity Immunity**: If item drops are permitted, spawned drop entities receive invulnerability against fire, lava, explosions, and general damage, and cannot be picked up by mobs (e.g., zombies, piglins).
-* **Vanilla `/give` Entity Cleanup**: Detects pickup animation items (`makeFakeItem`) produced by command blocks or `/give`, clearing them right as animations finish to prevent uncollectible residue.
-
----
-
-## Third-Party Compatibility
-
-### Shopkeepers Integration
-Item-lock features native integration with the [Shopkeepers](https://www.spigotmc.org/resources/shopkeepers.80756/) plugin, allowing protected items to serve as trade stock or currency:
-
-* **Trading Windows**:
-  * Allows protected items in trading input slots as valid currency.
-  * Allows players to collect protected items safely from trade output slots.
-* **Editor Interface**:
-  * Shopkeepers and server staff can insert, set, or swap trade recipes using protected items inside the Shopkeepers editor GUI.
-* **Target Recognition**:
-  * Detects Shopkeeper entities (including armor stands) and blocks (sign shops), allowing shop menus to open without false-positive interaction cancellations.
-* Configurable independently via `compatibility.shopkeepers.allow-trading` and `allow-editor` in `config.yml`.
-
-### eShulkerBox Handheld Shulker Boxes
-Item-lock features dedicated integration with the [eShulkerBox](https://modrinth.com/plugin/eshulkerbox) handheld/virtual shulker box plugin:
-
-* **Handheld & Air-Open Interface Support**:
-  * Enables players opening a shulker box in hand or in air to deposit and retrieve protected items within the virtual shulker box interface.
-  * Fully supports mouse placement, shift-clicking, number-key hotbar swaps, and mouse dragging/painting.
-* **Zero-Trust Security Preserved**:
-  * Using dynamic reflection combined with inventory signature verification, only pure-storage shulker box interfaces are allowed. Custom crafting GUIs and non-storage plugin menus remain strictly blocked.
-* Configurable independently via `compatibility.eshulkerbox.allow-handheld-shulkerbox` in `config.yml`.
-
----
-
-## Anti-Ghost Items & Player Feedback
-
-* **Tick-Delayed Synchronization**: When an illegal move is cancelled, `player.updateInventory()` is scheduled on the subsequent tick to reconcile the server state with the client, eliminating client-side desync and ghost items.
-* **Actionbar Alerts**: Displays clean, real-time alert notifications via the Adventure API.
-* **Audio Feedback**: Triggers vanilla refusal audio (e.g., `ENTITY_VILLAGER_NO`).
-* **Cooldown Protection**: Tracks alert events via transient UUID timestamps, rate-limiting warnings and sound triggers to once per second to mitigate spam.
-
----
-
-## Commands & Permissions
-
-All commands require the `itemlock.admin` permission node (defaults to OP Level 2):
+Permission Node: `itemlock.admin` (Default: OP Level 2)
 
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
-| `/itemlock help` | None | Displays the formatted command manual. |
-| `/itemlock add <name> [-f]` | Template name (optional `-f`) | Samples the main-hand item, resets durability and repair costs to zero, and saves it. Requires `-f` to overwrite existing templates. |
-| `/itemlock remove <name>` | Existing template name | Deletes the template file and unloads it from memory. |
-| `/itemlock check` | None | Inspects the main-hand item to verify if it is protected and prints the matching template name. |
-| `/itemlock list` | None | Lists all loaded template names, files, and corresponding materials. |
-| `/itemlock reload` | None | Clears the cache and reloads all template files and global settings. |
+| `/itemlock help` | None | Displays the command help menu. |
+| `/itemlock gui` | None | Opens the 54-slot template browser GUI. |
+| `/itemlock list` | None | Views all registered templates (opens GUI for players; prints text in console). |
+| `/itemlock edit <name>` | Template Name | Opens the 27-slot individual setting editor GUI for the specified template. |
+| `/itemlock add <name> [-f]` | Template Name (Optional `-f`) | Registers the item held in the main hand as a template. Durability and repair costs are automatically normalized. Use `-f` to overwrite. |
+| `/itemlock remove <name>` | Template Name | Removes a registered template from disk and memory. |
+| `/itemlock check` | None | Checks whether the item in the main hand is protected and displays its template ID. |
+| `/itemlock reload` | None | Reloads `config.yml` and all template YAML files into memory. |
