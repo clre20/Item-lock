@@ -1,5 +1,6 @@
 package clre20.itemLock.listener;
 
+import clre20.itemLock.compatibility.advancedspyinventory.AdvancedSpyInventoryHook;
 import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
@@ -19,6 +20,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Map;
@@ -36,14 +38,17 @@ public class InventorySecurityListener implements Listener {
     private final FeedbackService feedbackService;
     private final ShopkeepersHook shopkeepersHook;
     private final EShulkerBoxHook eshulkerBoxHook;
+    private final AdvancedSpyInventoryHook spyInventoryHook;
 
     public InventorySecurityListener(PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService,
-                                     ShopkeepersHook shopkeepersHook, EShulkerBoxHook eshulkerBoxHook) {
+                                     ShopkeepersHook shopkeepersHook, EShulkerBoxHook eshulkerBoxHook,
+                                     AdvancedSpyInventoryHook spyInventoryHook) {
         this.config = config;
         this.itemMatcher = itemMatcher;
         this.feedbackService = feedbackService;
         this.shopkeepersHook = shopkeepersHook;
         this.eshulkerBoxHook = eshulkerBoxHook;
+        this.spyInventoryHook = spyInventoryHook;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -83,7 +88,14 @@ public class InventorySecurityListener implements Listener {
             }
         }
 
-        boolean isTopPureStorage = isPureStorage(player, topInventory);
+        // 介面內按 F 換手 (SWAP_OFFHAND)：游標所指的物品會被換入副手
+        // (此操作不會觸發 PlayerSwapHandItemsEvent，必須在此攔截)
+        if (event.getClick() == ClickType.SWAP_OFFHAND && itemMatcher.isDenyOffhand(event.getCurrentItem(), config)) {
+            cancelAndFeedback(event, player, config.getDenyOffhandMessage());
+            return;
+        }
+
+        boolean isTopPureStorage = isPureStorage(player, event.getView());
         boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
 
         // 情況 A：點擊頂部介面（Top Inventory）
@@ -114,6 +126,15 @@ public class InventorySecurityListener implements Listener {
                             cancelAndFeedback(event, player);
                             return;
                         }
+                    }
+                }
+
+                // 2-1. 按 F 將副手物品換入頂部介面（Offhand Swap）
+                if (event.getClick() == ClickType.SWAP_OFFHAND) {
+                    ItemStack offhandItem = player.getInventory().getItemInOffHand();
+                    if (itemMatcher.isProtected(offhandItem)) {
+                        cancelAndFeedback(event, player);
+                        return;
                     }
                 }
 
@@ -195,7 +216,7 @@ public class InventorySecurityListener implements Listener {
             }
         }
 
-        boolean isTopPureStorage = isPureStorage(player, topInventory);
+        boolean isTopPureStorage = isPureStorage(player, event.getView());
         boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
 
         // 若頂部介面已是純存儲容器，且不是隨身合成欄位，則放行
@@ -238,10 +259,16 @@ public class InventorySecurityListener implements Listener {
     }
 
     /**
-     * 判定指定介面是否為純存儲容器（含真實方塊容器、末影箱、隨身背包及受相容的虛擬/手持潛影盒）。
+     * 判定指定介面是否為純存儲容器（含真實方塊容器、末影箱、隨身背包、受相容的虛擬/手持潛影盒及 AdvancedSpyInventory 介面）。
      */
-    private boolean isPureStorage(Player player, Inventory topInventory) {
+    private boolean isPureStorage(Player player, InventoryView view) {
+        Inventory topInventory = view.getTopInventory();
         if (ContainerWhitelist.isPureStorage(topInventory, config.isAllowVirtualShulkerBox())) {
+            return true;
+        }
+
+        // AdvancedSpyInventory 查看背包 / 末影箱 / 生物背包介面相容判定
+        if (isSpyInventoryAllowed(view)) {
             return true;
         }
 
@@ -258,6 +285,15 @@ public class InventorySecurityListener implements Listener {
         return false;
     }
 
+    private boolean isSpyInventoryAllowed(InventoryView view) {
+        return switch (spyInventoryHook.getSpyType(view)) {
+            case PLAYER -> config.isAllowSpyPlayerInventory();
+            case ENDER_CHEST -> config.isAllowSpyEnderChest();
+            case ENTITY -> config.isAllowSpyEntityInventory();
+            case NONE -> false;
+        };
+    }
+
     private boolean isShopkeepersAllowed(Player player, Inventory topInventory) {
         if (!shopkeepersHook.isAvailable()) {
             return false;
@@ -272,11 +308,9 @@ public class InventorySecurityListener implements Listener {
     }
 
     private boolean isOffhandSlot(InventoryClickEvent event) {
+        // 僅玩家背包的 Slot 40 為副手槽（大箱子等頂部介面的第 40 格不可誤判）
         Inventory clicked = event.getClickedInventory();
         if (clicked != null && clicked.getType() == InventoryType.PLAYER && event.getSlot() == 40) {
-            return true;
-        }
-        if (event.getSlot() == 40) {
             return true;
         }
         // 在原版隨身 2x2 合成介面 (CraftingView) 或創造模式生存分頁中，副手槽為 rawSlot 45

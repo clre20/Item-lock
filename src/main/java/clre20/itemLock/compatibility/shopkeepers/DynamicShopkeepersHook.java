@@ -27,7 +27,7 @@ public class DynamicShopkeepersHook implements ShopkeepersHook {
                     this.delegate = new ShopkeepersHookImpl();
                     if (!loggedHook) {
                         loggedHook = true;
-                        Bukkit.getLogger().info("[Item-lock] 已成功動態掛接 Shopkeepers 插件！已啟用交易與編輯介面相容支援。");
+                        clre20.itemLock.util.Log.hook("已成功動態掛接 <white>Shopkeepers</white> 插件！");
                     }
                     return this.delegate;
                 }

@@ -50,7 +50,7 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
                 this.reflectionReady = true;
                 if (!loggedHook) {
                     loggedHook = true;
-                    Bukkit.getLogger().info("[Item-lock] 已成功動態掛接 eShulkerBox 插件！已啟用手持與背包快速開啟潛影盒相容支援。");
+                    clre20.itemLock.util.Log.hook("已成功動態掛接 <white>eShulkerBox</white> 插件！");
                 }
             }
         } catch (Throwable ignored) {

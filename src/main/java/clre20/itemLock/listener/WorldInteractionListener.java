@@ -10,6 +10,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -69,6 +70,13 @@ public class WorldInteractionListener implements Listener {
         }
 
         if (itemMatcher.isDenyAltarInteract(item, config)) {
+            // 門、活板門、柵欄門、按鈕、拉桿：放行方塊開關互動，但禁止使用手持物品
+            // (防止受保護的方塊類物品藉由潛行右鍵被放置到這些方塊上)
+            if (ContainerWhitelist.isSimpleInteractableBlock(clickedBlock)) {
+                event.setUseItemInHand(Event.Result.DENY);
+                return;
+            }
+
             // 若點擊的不是純存儲容器方塊（如祭壇、大鍋、合成台、附魔台、研磨石、鐵砧等）
             if (!ContainerWhitelist.isPureStorageBlock(clickedBlock)) {
                 event.setCancelled(true);

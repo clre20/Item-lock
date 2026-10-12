@@ -56,6 +56,14 @@ compatibility:
   virtual-shulkerbox:
     # 是否放行無方塊實體的虛擬潛影盒容器 (供隨身/手持潛影盒外掛存取受保護物品，預設 true)
     allow-virtual: true
+  advancedspyinventory:
+    # 是否允許在 AdvancedSpyInventory 查看玩家背包介面 (/invsee) 中存取受保護物品 (預設 true)
+    allow-player-inventory: true
+    # 是否允許在 AdvancedSpyInventory 查看玩家末影箱介面 (/enderchest) 中存取受保護物品 (預設 true)
+    allow-ender-chest: true
+    # 是否允許在 AdvancedSpyInventory 生物背包介面 (馬鞍袋、村民背包、怪物裝備等) 中存取受保護物品
+    # 注意：放入怪物裝備欄的物品可能隨生物死亡掉落或消失，預設 false
+    allow-entity-inventory: false
 
 # 反饋與體驗設定
 feedback:

@@ -28,7 +28,7 @@ Item-lock 是一款針對 Minecraft Paper 及 Purpur 伺服器端（1.21+）設�
   * **副手防護**：攔截 F 換手、基岩版 `/geyser offhand` 指令與背包副手槽移入。若因未知途徑殘留於副手，系統將在切換手持或關閉介面時自動移回主背包。
   * **方塊防放**：禁止玩家將受保護的方塊類物品作為方塊放置到世界上。
   * **合成防拓印**：當 3x3 工作台或 2x2 隨身合成矩陣中包含受保護物品時，自動清空合成產物並取消事件，防止地圖複製或配方加工。
-  * **非容器方塊交互防護**：手持受保護物品右鍵非純存儲方塊（如祭壇、大鍋、附魔台）時取消交互。
+  * **非容器方塊交互防護**：手持受保護物品右鍵非純存儲方塊（如祭壇、大鍋、附魔台）時取消交互。門、活板門、柵欄門、按鈕、拉桿等開關類方塊仍可正常互動，但不會使用手持物品（受保護的方塊類物品無法藉潛行右鍵放置）。
   * **實體交互防護**：禁止將受保護物品放入展示框、發光展示框或裝備在盔甲架上。
   * **丟棄防護**：可選開啟禁止按 Q 丟棄。掉落實體生成時自動賦予火焰、岩漿、爆炸傷害免疫，並禁止生物拾取。
 
@@ -38,6 +38,7 @@ Item-lock 是一款針對 Minecraft Paper 及 Purpur 伺服器端（1.21+）設�
 * **第三方外掛相容支援**
   * **Shopkeepers**：原生支援村民商店，允許受保護物品作為貨幣或商品交易，並支援在店主設定介面中進行配方配置。
   * **eShulkerBox**：支援在手持或隨身開啟的潛影盒介面中安全存取受保護物品。
+  * **AdvancedSpyInventory**：支援在查看玩家背包（`/invsee`）與末影箱（`/enderchest`）介面中存取受保護物品；生物背包介面預設不放行，可於設定檔開啟。
 
 * **防幽靈物品與操作反饋**
   * 攔截操作時於螢幕正下方顯示 Actionbar 提示並播放拒絕音效（具備冷卻防刷保護）。
@@ -90,7 +91,7 @@ Item-lock is an item protection plugin for Paper and Purpur Minecraft servers (1
   * **Offhand Restriction**: Prevents moving protected items to the offhand slot via keybinds (F key), Bedrock `/geyser offhand` commands, or shift-clicking. Automatically returns residual offhand items to the main inventory.
   * **Block Placement Guard**: Prevents players from placing protected block-type items into the physical world.
   * **Crafting Protection**: Clears the output and cancels crafting if a protected item is placed inside a 3x3 crafting table or 2x2 player inventory grid (prevents vanilla map cloning and recipes).
-  * **Non-Storage Block Interaction**: Cancels right-click interactions on non-storage blocks (e.g. cauldrons, enchanting tables) while holding protected items.
+  * **Non-Storage Block Interaction**: Cancels right-click interactions on non-storage blocks (e.g. cauldrons, enchanting tables) while holding protected items. Doors, trapdoors, fence gates, buttons, and levers can still be toggled, but the held item is not used (protected block items cannot be sneak-placed onto them).
   * **Entity Interaction**: Prevents inserting protected items into item frames, glowing item frames, or armor stands.
   * **Drop Protection**: Optional toggle to prevent dropping via the Q key. Dropped entities receive immunity against fire, lava, explosions, and mob pickup.
 
@@ -100,6 +101,7 @@ Item-lock is an item protection plugin for Paper and Purpur Minecraft servers (1
 * **Third-Party Compatibility**
   * **Shopkeepers**: Built-in support allowing protected items to be used as trading currency or items, and allowing configuration in the Shopkeepers editor menu.
   * **eShulkerBox**: Allows storing and retrieving protected items within handheld or virtual shulker box interfaces.
+  * **AdvancedSpyInventory**: Allows moving protected items in the player inventory (`/invsee`) and ender chest (`/enderchest`) viewers. Entity inventory viewers are blocked by default and can be enabled in the config.
 
 * **Player Feedback & Anti-Desync**
   * Displays Actionbar notifications and plays refusal sounds when an illegal action is blocked.

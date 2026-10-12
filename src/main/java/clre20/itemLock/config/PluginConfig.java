@@ -36,6 +36,10 @@ public class PluginConfig {
     private boolean allowEShulkerBox;
     private boolean allowVirtualShulkerBox;
 
+    private boolean allowSpyPlayerInventory;
+    private boolean allowSpyEnderChest;
+    private boolean allowSpyEntityInventory;
+
     private boolean actionbarEnabled;
     private String actionbarMessage;
 
@@ -97,6 +101,10 @@ public class PluginConfig {
         this.allowEShulkerBox = config.getBoolean("compatibility.eshulkerbox.allow-handheld-shulkerbox", true);
         this.allowVirtualShulkerBox = config.getBoolean("compatibility.virtual-shulkerbox.allow-virtual", true);
 
+        this.allowSpyPlayerInventory = config.getBoolean("compatibility.advancedspyinventory.allow-player-inventory", true);
+        this.allowSpyEnderChest = config.getBoolean("compatibility.advancedspyinventory.allow-ender-chest", true);
+        this.allowSpyEntityInventory = config.getBoolean("compatibility.advancedspyinventory.allow-entity-inventory", false);
+
         this.actionbarEnabled = config.getBoolean("feedback.actionbar.enabled", true);
         this.actionbarMessage = config.getString("feedback.actionbar.message",
                 "<red>⚠ 此物品受特殊保護，無法在此介面中進行修改或加工！</red>");
@@ -108,7 +116,7 @@ public class PluginConfig {
             Sound s = Sound.valueOf(soundName.toUpperCase());
             this.soundType = s;
         } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("找不到設定的音效: " + soundName + "，使用預設音效 ENTITY_VILLAGER_NO");
+            clre20.itemLock.util.Log.warn("設定檔", "找不到設定的音效: <yellow>" + soundName + "</yellow>，自動回退使用預設音效 <gold>ENTITY_VILLAGER_NO</gold>");
             this.soundType = Sound.ENTITY_VILLAGER_NO;
         }
 
@@ -286,6 +294,18 @@ public class PluginConfig {
 
     public boolean isAllowVirtualShulkerBox() {
         return allowVirtualShulkerBox;
+    }
+
+    public boolean isAllowSpyPlayerInventory() {
+        return allowSpyPlayerInventory;
+    }
+
+    public boolean isAllowSpyEnderChest() {
+        return allowSpyEnderChest;
+    }
+
+    public boolean isAllowSpyEntityInventory() {
+        return allowSpyEntityInventory;
     }
 
     public String getAddSuccess() {

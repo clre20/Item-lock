@@ -120,4 +120,21 @@ public final class ContainerWhitelist {
         // 所有顏色的潛影盒
         return Tag.SHULKER_BOXES.isTagged(material);
     }
+
+    /**
+     * 檢查指定方塊是否為單純開關類互動方塊（門、活板門、柵欄門、按鈕、拉桿）。
+     * 此類方塊右鍵僅切換開關狀態，不會消耗或轉化手持物品。
+     */
+    public static boolean isSimpleInteractableBlock(Block block) {
+        if (block == null) {
+            return false;
+        }
+
+        Material material = block.getType();
+        return Tag.DOORS.isTagged(material)
+                || Tag.TRAPDOORS.isTagged(material)
+                || Tag.FENCE_GATES.isTagged(material)
+                || Tag.BUTTONS.isTagged(material)
+                || material == Material.LEVER;
+    }
 }

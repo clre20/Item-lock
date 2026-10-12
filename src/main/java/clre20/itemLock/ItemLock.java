@@ -2,6 +2,7 @@ package clre20.itemLock;
 
 import clre20.itemLock.command.ItemLockCommand;
 import clre20.itemLock.command.ItemLockTabCompleter;
+import clre20.itemLock.compatibility.advancedspyinventory.AdvancedSpyInventoryHook;
 import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
@@ -32,6 +33,7 @@ public final class ItemLock extends JavaPlugin {
     private FeedbackService feedbackService;
     private ShopkeepersHook shopkeepersHook;
     private EShulkerBoxHook eshulkerBoxHook;
+    private AdvancedSpyInventoryHook spyInventoryHook;
 
     public static ItemLock getInstance() {
         return instance;
@@ -50,13 +52,15 @@ public final class ItemLock extends JavaPlugin {
         this.itemMatcher = new ItemMatcher(this.templateManager);
         this.feedbackService = new FeedbackService(this, this.pluginConfig);
 
-        // 3. 初始化第三方插件相容 Hook (Shopkeepers, eShulkerBox - 具備延遲動態掛接能力)
-        this.shopkeepersHook = ShopkeepersHook.create();
+        // 3. 初始化第三方插件相容 Hook (eShulkerBox 先, Shopkeepers 後 - 具備延遲動態掛接能力)
         this.eshulkerBoxHook = EShulkerBoxHook.create();
+        this.shopkeepersHook = ShopkeepersHook.create();
+        this.shopkeepersHook.isAvailable();
+        this.spyInventoryHook = AdvancedSpyInventoryHook.create();
 
         // 4. 註冊安全監聽器
         PluginManager pm = getServer().getPluginManager();
-        pm.registerEvents(new InventorySecurityListener(this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook, this.eshulkerBoxHook), this);
+        pm.registerEvents(new InventorySecurityListener(this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook, this.eshulkerBoxHook, this.spyInventoryHook), this);
         pm.registerEvents(new CraftingSecurityListener(this.itemMatcher, this.feedbackService), this);
         pm.registerEvents(new AutomationSecurityListener(this.pluginConfig, this.itemMatcher), this);
         pm.registerEvents(new WorldInteractionListener(this, this.pluginConfig, this.itemMatcher, this.feedbackService, this.shopkeepersHook), this);
@@ -69,15 +73,20 @@ public final class ItemLock extends JavaPlugin {
             command.setExecutor(new ItemLockCommand(this.pluginConfig, this.templateManager, this.itemMatcher));
             command.setTabCompleter(new ItemLockTabCompleter(this.templateManager));
         } else {
-            getLogger().severe("無法找到 plugin.yml 中的指令 'itemlock'，請檢查設定！");
+            clre20.itemLock.util.Log.error("指令", "無法找到 plugin.yml 中的指令 'itemlock'，請檢查設定！");
         }
 
-        getLogger().info("Item-lock 插件已成功載入！零信任安全網已啟動。");
+        // 6. 輸出精美控制台啟動狀態卡與核心就緒訊息
+        boolean shopkeepersActive = this.shopkeepersHook != null && this.shopkeepersHook.isAvailable();
+        boolean eshulkerBoxActive = this.eshulkerBoxHook != null && this.eshulkerBoxHook.isAvailable();
+        boolean spyInventoryActive = this.spyInventoryHook != null && this.spyInventoryHook.isAvailable();
+        clre20.itemLock.util.Log.printStartupBanner(getDescription().getVersion(), shopkeepersActive, eshulkerBoxActive, spyInventoryActive);
+        clre20.itemLock.util.Log.core("插件已成功載入！");
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("Item-lock 插件已卸載。");
+        clre20.itemLock.util.Log.core("插件已關閉");
         instance = null;
     }
 
@@ -103,5 +112,9 @@ public final class ItemLock extends JavaPlugin {
 
     public EShulkerBoxHook getEShulkerBoxHook() {
         return eshulkerBoxHook;
+    }
+
+    public AdvancedSpyInventoryHook getSpyInventoryHook() {
+        return spyInventoryHook;
     }
 }

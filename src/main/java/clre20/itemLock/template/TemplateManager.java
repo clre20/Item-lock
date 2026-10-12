@@ -57,7 +57,7 @@ public class TemplateManager {
 
         if (!templatesFolder.exists()) {
             if (!templatesFolder.mkdirs()) {
-                plugin.getLogger().warning("無法建立 templates 目錄: " + templatesFolder.getAbsolutePath());
+                clre20.itemLock.util.Log.warn("樣本庫", "無法建立 templates 目錄: <yellow>" + templatesFolder.getAbsolutePath() + "</yellow>");
                 return;
             }
         }
@@ -76,11 +76,11 @@ public class TemplateManager {
                     loadedCount++;
                 }
             } catch (Exception e) {
-                plugin.getLogger().severe("載入樣本檔案失敗: " + file.getName() + ", 原因: " + e.getMessage());
+                clre20.itemLock.util.Log.error("樣本庫", "載入樣本檔案失敗: <yellow>" + file.getName() + "</yellow>，原因: " + e.getMessage());
             }
         }
 
-        plugin.getLogger().info("已成功載入 " + loadedCount + " 個物品保護樣本至快取庫中。");
+        clre20.itemLock.util.Log.template("已成功載入 <gold>" + loadedCount + "</gold> 個物品保護樣本。");
     }
 
     /**
@@ -112,7 +112,7 @@ public class TemplateManager {
 
         String base64Data = config.getString("data");
         if (base64Data == null || base64Data.isBlank()) {
-            plugin.getLogger().warning("檔案 " + file.getName() + " 缺少 binary data，跳過載入。");
+            clre20.itemLock.util.Log.warn("樣本庫", "檔案 <yellow>" + file.getName() + "</yellow> 缺少 binary data，跳過載入。");
             return null;
         }
 
