@@ -39,6 +39,7 @@ Item-lock 是一款針對 Minecraft Paper 及 Purpur 伺服器端（1.21+）設�
   * **Shopkeepers**：原生支援村民商店，允許受保護物品作為貨幣或商品交易，並支援在店主設定介面中進行配方配置。
   * **eShulkerBox**：支援在手持或隨身開啟的潛影盒介面中安全存取受保護物品。
   * **AdvancedSpyInventory**：支援在查看玩家背包（`/invsee`）與末影箱（`/enderchest`）介面中存取受保護物品；生物背包介面預設不放行，可於設定檔開啟。
+  * **Cmail**：支援在 Cmail 郵件介面中將受保護物品作為附件寄送與領取（需 Cmail 使用 `CmailHolder` 的版本）。
 
 * **防幽靈物品與操作反饋**
   * 攔截操作時於螢幕正下方顯示 Actionbar 提示並播放拒絕音效（具備冷卻防刷保護）。
@@ -102,6 +103,7 @@ Item-lock is an item protection plugin for Paper and Purpur Minecraft servers (1
   * **Shopkeepers**: Built-in support allowing protected items to be used as trading currency or items, and allowing configuration in the Shopkeepers editor menu.
   * **eShulkerBox**: Allows storing and retrieving protected items within handheld or virtual shulker box interfaces.
   * **AdvancedSpyInventory**: Allows moving protected items in the player inventory (`/invsee`) and ender chest (`/enderchest`) viewers. Entity inventory viewers are blocked by default and can be enabled in the config.
+  * **Cmail**: Allows sending and claiming protected items as mail attachments in Cmail GUIs (requires a Cmail build that uses `CmailHolder`).
 
 * **Player Feedback & Anti-Desync**
   * Displays Actionbar notifications and plays refusal sounds when an illegal action is blocked.

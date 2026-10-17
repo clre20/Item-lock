@@ -1,6 +1,7 @@
 package clre20.itemLock.listener;
 
 import clre20.itemLock.compatibility.advancedspyinventory.AdvancedSpyInventoryHook;
+import clre20.itemLock.compatibility.cmail.CmailCompat;
 import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
@@ -30,6 +31,7 @@ import java.util.Map;
  * 當玩家開啟的頂部介面不在純存儲白名單內時，徹底封死所有移入、加工、偷換操作。
  * 支援與 Shopkeepers 插件深度相容（放行交易介面與編輯設定介面）。
  * 支援與 eShulkerBox 等手持/隨身開啟潛影盒插件相容（放行純存儲取放操作）。
+ * 支援與 Cmail 郵件插件相容（放行郵件附件的放入與領取）。
  */
 public class InventorySecurityListener implements Listener {
 
@@ -259,7 +261,7 @@ public class InventorySecurityListener implements Listener {
     }
 
     /**
-     * 判定指定介面是否為純存儲容器（含真實方塊容器、末影箱、隨身背包、受相容的虛擬/手持潛影盒及 AdvancedSpyInventory 介面）。
+     * 判定指定介面是否為純存儲容器（含真實方塊容器、末影箱、隨身背包、受相容的虛擬/手持潛影盒、AdvancedSpyInventory 及 Cmail 介面）。
      */
     private boolean isPureStorage(Player player, InventoryView view) {
         Inventory topInventory = view.getTopInventory();
@@ -274,6 +276,11 @@ public class InventorySecurityListener implements Listener {
 
         // eShulkerBox 手持/隨身開啟潛影盒相容判定
         if (config.isAllowEShulkerBox() && eshulkerBoxHook.isEShulkerBoxOpen(player, topInventory)) {
+            return true;
+        }
+
+        // Cmail 郵件介面相容判定（寄送附件、領取附件等）
+        if (config.isAllowCmail() && CmailCompat.isCmailInventory(topInventory)) {
             return true;
         }
 

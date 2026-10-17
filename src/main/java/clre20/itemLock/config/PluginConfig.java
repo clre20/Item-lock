@@ -40,6 +40,8 @@ public class PluginConfig {
     private boolean allowSpyEnderChest;
     private boolean allowSpyEntityInventory;
 
+    private boolean allowCmail;
+
     private boolean actionbarEnabled;
     private String actionbarMessage;
 
@@ -104,6 +106,8 @@ public class PluginConfig {
         this.allowSpyPlayerInventory = config.getBoolean("compatibility.advancedspyinventory.allow-player-inventory", true);
         this.allowSpyEnderChest = config.getBoolean("compatibility.advancedspyinventory.allow-ender-chest", true);
         this.allowSpyEntityInventory = config.getBoolean("compatibility.advancedspyinventory.allow-entity-inventory", false);
+
+        this.allowCmail = config.getBoolean("compatibility.cmail.allow-mail", true);
 
         this.actionbarEnabled = config.getBoolean("feedback.actionbar.enabled", true);
         this.actionbarMessage = config.getString("feedback.actionbar.message",
@@ -306,6 +310,10 @@ public class PluginConfig {
 
     public boolean isAllowSpyEntityInventory() {
         return allowSpyEntityInventory;
+    }
+
+    public boolean isAllowCmail() {
+        return allowCmail;
     }
 
     public String getAddSuccess() {
