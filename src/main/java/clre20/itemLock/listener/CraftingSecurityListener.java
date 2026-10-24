@@ -1,6 +1,7 @@
 package clre20.itemLock.listener;
 
 import clre20.itemLock.feedback.FeedbackService;
+import clre20.itemLock.feedback.FeedbackService.Deny;
 import clre20.itemLock.matcher.ItemMatcher;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -12,49 +13,49 @@ import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
 
 /**
- * 工作台與隨身 2x2 地圖拓印與合成防堵監聽器。
- * 檢查 3x3 工作台及 2x2 隨身合成矩陣，若包含受保護物品或地圖，直接將產物設為空並取消合成。
+ * 合成格（3x3、2x2）內有受保護物品時清空產物並取消合成（防地圖複製等）。
  */
-public class CraftingSecurityListener implements Listener {
+public final class CraftingSecurityListener implements Listener {
 
-    private final ItemMatcher itemMatcher;
-    private final FeedbackService feedbackService;
+    private final ItemMatcher matcher;
+    private final FeedbackService feedback;
 
-    public CraftingSecurityListener(ItemMatcher itemMatcher, FeedbackService feedbackService) {
-        this.itemMatcher = itemMatcher;
-        this.feedbackService = feedbackService;
+    public CraftingSecurityListener(ItemMatcher matcher, FeedbackService feedback) {
+        this.matcher = matcher;
+        this.feedback = feedback;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPrepareItemCraft(PrepareItemCraftEvent event) {
-        CraftingInventory inventory = event.getInventory();
-        ItemStack[] matrix = inventory.getMatrix();
-
-        for (ItemStack item : matrix) {
-            if (itemMatcher.isProtected(item)) {
-                // 直接將產物設為空，徹底封死原版地圖拓印複製與一切合成產出
-                inventory.setResult(null);
-                return;
-            }
+        CraftingInventory inv = event.getInventory();
+        // 沒有產物就沒有東西要擋
+        if (inv.getResult() == null) {
+            return;
+        }
+        if (containsProtected(inv)) {
+            inv.setResult(null);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCraftItem(CraftItemEvent event) {
-        CraftingInventory inventory = event.getInventory();
-        ItemStack[] matrix = inventory.getMatrix();
+        CraftingInventory inv = event.getInventory();
+        if (!containsProtected(inv)) {
+            return;
+        }
+        event.setCancelled(true);
+        inv.setResult(null);
+        if (event.getWhoClicked() instanceof Player player) {
+            feedback.deny(player, Deny.DEFAULT);
+        }
+    }
 
-        for (ItemStack item : matrix) {
-            if (itemMatcher.isProtected(item)) {
-                event.setCancelled(true);
-                inventory.setResult(null);
-
-                if (event.getWhoClicked() instanceof Player player) {
-                    feedbackService.sendDenyFeedback(player);
-                    feedbackService.syncInventoryNextTick(player);
-                }
-                return;
+    private boolean containsProtected(CraftingInventory inv) {
+        for (ItemStack item : inv.getMatrix()) {
+            if (matcher.find(item) != null) {
+                return true;
             }
         }
+        return false;
     }
 }

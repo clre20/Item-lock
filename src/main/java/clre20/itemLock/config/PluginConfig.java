@@ -1,370 +1,148 @@
 package clre20.itemLock.config;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.Sound;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.Collections;
-import java.util.List;
+import java.util.Locale;
 
 /**
- * 負責解析與管理 Item-lock 的全域設定檔。
+ * config.yml 的值。每次讀取都先補齊缺少的項目；所有值都有預設，不會出現 null。
  */
-public class PluginConfig {
+public final class PluginConfig {
 
-    private final Plugin plugin;
-    private final MiniMessage miniMessage = MiniMessage.miniMessage();
-    private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.legacyAmpersand();
+    private final JavaPlugin plugin;
 
     private boolean denyDrop;
     private boolean denyOffhand;
     private boolean denyBlockPlace;
     private boolean denyAltarInteract;
     private boolean denyEntityInteract;
-
     private boolean allowHopperMove;
     private boolean allowHopperPickup;
-
     private boolean preventDespawn;
 
     private boolean allowShopkeepersTrading;
     private boolean allowShopkeepersEditor;
-
     private boolean allowEShulkerBox;
     private boolean allowVirtualShulkerBox;
-
     private boolean allowSpyPlayerInventory;
     private boolean allowSpyEnderChest;
     private boolean allowSpyEntityInventory;
-
     private boolean allowCmail;
 
     private boolean actionbarEnabled;
-    private String actionbarMessage;
-
     private boolean soundEnabled;
-    private Sound soundType;
+    private Sound sound = Sound.ENTITY_VILLAGER_NO;
+    private String invalidSoundName;
     private float soundVolume;
     private float soundPitch;
-
     private long cooldownMs;
 
-    private String prefix;
-    private String noPermission;
-    private String playerOnly;
-    private String reloadSuccess;
-    private String addSuccess;
-    private String addAlreadyExists;
-    private String addOverwriteSuccess;
-    private String addAir;
-    private String addInvalidName;
-    private String removeSuccess;
-    private String removeNotFound;
-    private String checkProtected;
-    private String checkNotProtected;
-    private String listHeader;
-    private String listItem;
-    private String listEmpty;
-    private String denyOffhandMessage;
-    private String denyBlockPlaceMessage;
-    private List<String> helpMessages;
+    private boolean guiSounds;
+    private boolean checkOnStartup;
+    private boolean notifyOnJoin;
 
-    public PluginConfig(Plugin plugin) {
+    public PluginConfig(JavaPlugin plugin) {
         this.plugin = plugin;
         load();
     }
 
-    /**
-     * 從磁碟重新載入設定。
-     */
-    @SuppressWarnings({"deprecation", "removal"})
     public void load() {
-        plugin.saveDefaultConfig();
-        plugin.reloadConfig();
-        FileConfiguration config = plugin.getConfig();
+        YamlConfiguration c = YamlUpdater.load(plugin, "config.yml");
 
-        this.denyDrop = config.getBoolean("deny-drop", false);
-        this.denyOffhand = config.getBoolean("deny-offhand", false);
-        this.denyBlockPlace = config.getBoolean("deny-block-place", true);
-        this.denyAltarInteract = config.getBoolean("deny-altar-interact", true);
-        this.denyEntityInteract = config.getBoolean("deny-entity-interact", false);
+        denyDrop = c.getBoolean("deny-drop", false);
+        denyOffhand = c.getBoolean("deny-offhand", false);
+        denyBlockPlace = c.getBoolean("deny-block-place", true);
+        denyAltarInteract = c.getBoolean("deny-altar-interact", true);
+        denyEntityInteract = c.getBoolean("deny-entity-interact", false);
+        allowHopperMove = c.getBoolean("hopper.allow-move", true);
+        allowHopperPickup = c.getBoolean("hopper.allow-pickup", true);
+        preventDespawn = c.getBoolean("drop-protection.prevent-despawn", false);
 
-        this.allowHopperMove = config.getBoolean("hopper.allow-move", true);
-        this.allowHopperPickup = config.getBoolean("hopper.allow-pickup", true);
+        allowShopkeepersTrading = c.getBoolean("compatibility.shopkeepers.allow-trading", true);
+        allowShopkeepersEditor = c.getBoolean("compatibility.shopkeepers.allow-editor", true);
+        allowEShulkerBox = c.getBoolean("compatibility.eshulkerbox.allow-handheld-shulkerbox", true);
+        allowVirtualShulkerBox = c.getBoolean("compatibility.virtual-shulkerbox.allow-virtual", true);
+        allowSpyPlayerInventory = c.getBoolean("compatibility.advancedspyinventory.allow-player-inventory", true);
+        allowSpyEnderChest = c.getBoolean("compatibility.advancedspyinventory.allow-ender-chest", true);
+        allowSpyEntityInventory = c.getBoolean("compatibility.advancedspyinventory.allow-entity-inventory", false);
+        allowCmail = c.getBoolean("compatibility.cmail.allow-mail", true);
 
-        this.preventDespawn = config.getBoolean("drop-protection.prevent-despawn", false);
+        actionbarEnabled = c.getBoolean("feedback.actionbar.enabled", true);
+        soundEnabled = c.getBoolean("feedback.sound.enabled", true);
+        String soundName = c.getString("feedback.sound.type", "ENTITY_VILLAGER_NO");
+        Sound parsed = parseSound(soundName);
+        invalidSoundName = parsed == null ? soundName : null;
+        sound = parsed != null ? parsed : Sound.ENTITY_VILLAGER_NO;
+        soundVolume = clamp((float) c.getDouble("feedback.sound.volume", 1.0), 0f, 10f);
+        soundPitch = clamp((float) c.getDouble("feedback.sound.pitch", 0.8), 0.5f, 2f);
+        cooldownMs = Math.max(0L, c.getLong("feedback.cooldown-ms", 1000L));
 
-        this.allowShopkeepersTrading = config.getBoolean("compatibility.shopkeepers.allow-trading", true);
-        this.allowShopkeepersEditor = config.getBoolean("compatibility.shopkeepers.allow-editor", true);
+        guiSounds = c.getBoolean("gui.sounds", true);
+        checkOnStartup = c.getBoolean("update-checker.check-on-startup", true);
+        notifyOnJoin = c.getBoolean("update-checker.notify-on-join", true);
+    }
 
-        this.allowEShulkerBox = config.getBoolean("compatibility.eshulkerbox.allow-handheld-shulkerbox", true);
-        this.allowVirtualShulkerBox = config.getBoolean("compatibility.virtual-shulkerbox.allow-virtual", true);
-
-        this.allowSpyPlayerInventory = config.getBoolean("compatibility.advancedspyinventory.allow-player-inventory", true);
-        this.allowSpyEnderChest = config.getBoolean("compatibility.advancedspyinventory.allow-ender-chest", true);
-        this.allowSpyEntityInventory = config.getBoolean("compatibility.advancedspyinventory.allow-entity-inventory", false);
-
-        this.allowCmail = config.getBoolean("compatibility.cmail.allow-mail", true);
-
-        this.actionbarEnabled = config.getBoolean("feedback.actionbar.enabled", true);
-        this.actionbarMessage = config.getString("feedback.actionbar.message",
-                "<red>⚠ 此物品受特殊保護，無法在此介面中進行修改或加工！</red>");
-
-        this.soundEnabled = config.getBoolean("feedback.sound.enabled", true);
-        String soundName = config.getString("feedback.sound.type", "ENTITY_VILLAGER_NO");
-        try {
-            @SuppressWarnings("deprecation")
-            Sound s = Sound.valueOf(soundName.toUpperCase());
-            this.soundType = s;
-        } catch (IllegalArgumentException e) {
-            clre20.itemLock.util.Log.warn("設定檔", "找不到設定的音效: <yellow>" + soundName + "</yellow>，自動回退使用預設音效 <gold>ENTITY_VILLAGER_NO</gold>");
-            this.soundType = Sound.ENTITY_VILLAGER_NO;
+    /** 接受 ENTITY_VILLAGER_NO 或 entity.villager.no 兩種寫法。 */
+    private static Sound parseSound(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
         }
-
-        this.soundVolume = (float) config.getDouble("feedback.sound.volume", 1.0);
-        this.soundPitch = (float) config.getDouble("feedback.sound.pitch", 0.8);
-        this.cooldownMs = config.getLong("feedback.cooldown-ms", 1000L);
-
-        this.prefix = config.getString("messages.prefix", "<gold>[Item-Lock]</gold> ");
-        this.noPermission = config.getString("messages.no-permission", "<red>你沒有權限執行此指令！</red>");
-        this.playerOnly = config.getString("messages.player-only", "<red>此指令僅能由玩家在遊戲內執行！</red>");
-        this.reloadSuccess = config.getString("messages.reload-success",
-                "<green>設定檔與物品樣本庫已成功重新載入！(共載入 <count> 個保護樣本)</green>");
-        this.addSuccess = config.getString("messages.add-success",
-                "<green>已成功將主手物品登錄為保護樣本：<gold><id></gold></green>");
-        this.addAlreadyExists = config.getString("messages.add-already-exists",
-                "<red>保護樣本 <gold><id></gold> 已存在！若要覆蓋請使用：<yellow>/itemlock add <id> -f</yellow></red>");
-        this.addOverwriteSuccess = config.getString("messages.add-overwrite-success",
-                "<green>已成功覆蓋並更新保護樣本：<gold><id></gold></green>");
-        this.addAir = config.getString("messages.add-air", "<red>主手不可為空！請手持欲保護的物品。</red>");
-        this.addInvalidName = config.getString("messages.add-invalid-name",
-                "<red>名稱格式錯誤！僅能使用英數字、底線與連字符 (^[a-zA-Z0-9_-]+$)</red>");
-        this.removeSuccess = config.getString("messages.remove-success",
-                "<green>已成功刪除保護樣本：<gold><id></gold></green>");
-        this.removeNotFound = config.getString("messages.remove-not-found",
-                "<red>找不到名為 <gold><id></gold> 的保護樣本！</red>");
-        this.checkProtected = config.getString("messages.check-protected",
-                "<green>手持物品受特殊保護！匹配樣本：<gold><id></gold></green>");
-        this.checkNotProtected = config.getString("messages.check-not-protected",
-                "<yellow>手持物品不受保護。</yellow>");
-        this.listHeader = config.getString("messages.list-header",
-                "<gold>===== [ 已登錄的保護物品樣本 (<count>) ] =====</gold>");
-        this.listItem = config.getString("messages.list-item",
-                "<yellow>- <gold><id></gold> (<white><material></white>)</yellow>");
-        this.listEmpty = config.getString("messages.list-empty",
-                "<gray>目前尚未登錄任何保護物品樣本。</gray>");
-        this.denyOffhandMessage = config.getString("messages.deny-offhand",
-                "<red>⚠ 此物品受特殊保護，禁止放置在副手！</red>");
-        this.denyBlockPlaceMessage = config.getString("messages.deny-block-place",
-                "<red>⚠ 此物品受特殊保護，禁止作為方塊放置在世界上！</red>");
-        List<String> rawHelp = config.getStringList("messages.help");
-        List<String> filteredHelp = rawHelp.stream()
-                .filter(line -> !line.contains("※") && !line.contains("----------------"))
-                .toList();
-
-        boolean isMissingCommands = filteredHelp.isEmpty() ||
-                filteredHelp.stream().noneMatch(s -> s.contains("gui")) ||
-                filteredHelp.stream().noneMatch(s -> s.contains("edit"));
-
-        if (isMissingCommands) {
-            this.helpMessages = List.of(
-                    "<gold>================ [ Item-Lock 指令手冊 ] ================",
-                    "<yellow>/itemlock help <gray>- 顯示指令說明手冊",
-                    "<yellow>/itemlock gui <gray>- 開啟保護物品樣本庫管理箱子介面 (54 格)",
-                    "<yellow>/itemlock list <gray>- 查看所有樣本（玩家執行將自動開啟箱子介面）",
-                    "<yellow>/itemlock edit <名稱> <gray>- 開啟指定樣本的個別屬性開關設定箱 (27 格)",
-                    "<yellow>/itemlock add <名稱> [-f] <gray>- 將主手物品登錄為保護樣本 (-f 強制覆蓋)",
-                    "<yellow>/itemlock remove <名稱> <gray>- 刪除指定的保護樣本",
-                    "<yellow>/itemlock check <gray>- 檢測主手物品是否受保護及匹配樣本名稱",
-                    "<yellow>/itemlock reload <gray>- 重新載入設定檔與保護樣本庫",
-                    "<gold>========================================================"
-            );
-        } else {
-            this.helpMessages = filteredHelp;
+        String key = name.trim().toLowerCase(Locale.ROOT);
+        if (!key.contains(".")) {
+            key = key.replace('_', '.');
         }
-    }
-
-    /**
-     * 將包含 MiniMessage 標籤或 Legacy 顏色代碼的字串解析為 Adventure Component。
-     */
-    public Component parseComponent(String text) {
-        if (text == null) {
-            return Component.empty();
+        NamespacedKey nk = NamespacedKey.fromString(key);
+        if (nk == null) {
+            return null;
         }
-        if (text.contains("&") || text.contains("§")) {
-            return legacySerializer.deserialize(text.replace("§", "&"));
+        Sound s = Registry.SOUNDS.get(nk);
+        if (s != null) {
+            return s;
         }
-        return miniMessage.deserialize(text);
+        // 底線本身是名稱一部分的音效（例如 ui.button.click 以外的特殊名稱）退回列舉名稱比對
+        for (Sound candidate : Registry.SOUNDS) {
+            String enumName = candidate.getKey().getKey().replace('.', '_').toUpperCase(Locale.ROOT);
+            if (enumName.equals(name.trim().toUpperCase(Locale.ROOT))) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
-    public boolean isDenyDrop() {
-        return denyDrop;
+    private static float clamp(float v, float min, float max) {
+        return Math.max(min, Math.min(max, v));
     }
 
-    public boolean isDenyOffhand() {
-        return denyOffhand;
-    }
+    /** 讀取時找不到的音效名稱（沒有則為 null），由主類別輸出警告。 */
+    public String getInvalidSoundName() { return invalidSoundName; }
 
-    public boolean isDenyBlockPlace() {
-        return denyBlockPlace;
-    }
-
-    public String getDenyOffhandMessage() {
-        return denyOffhandMessage;
-    }
-
-    public String getDenyBlockPlaceMessage() {
-        return denyBlockPlaceMessage;
-    }
-
-    public boolean isDenyAltarInteract() {
-        return denyAltarInteract;
-    }
-
-    public boolean isDenyEntityInteract() {
-        return denyEntityInteract;
-    }
-
-    public boolean isActionbarEnabled() {
-        return actionbarEnabled;
-    }
-
-    public String getActionbarMessage() {
-        return actionbarMessage;
-    }
-
-    public boolean isSoundEnabled() {
-        return soundEnabled;
-    }
-
-    public Sound getSoundType() {
-        return soundType;
-    }
-
-    public float getSoundVolume() {
-        return soundVolume;
-    }
-
-    public float getSoundPitch() {
-        return soundPitch;
-    }
-
-    public long getCooldownMs() {
-        return cooldownMs;
-    }
-
-    public String getPrefix() {
-        return prefix;
-    }
-
-    public String getNoPermission() {
-        return noPermission;
-    }
-
-    public String getPlayerOnly() {
-        return playerOnly;
-    }
-
-    public String getReloadSuccess() {
-        return reloadSuccess;
-    }
-
-    public boolean isAllowHopperMove() {
-        return allowHopperMove;
-    }
-
-    public boolean isAllowHopperPickup() {
-        return allowHopperPickup;
-    }
-
-    public boolean isPreventDespawn() {
-        return preventDespawn;
-    }
-
-    public boolean isAllowShopkeepersTrading() {
-        return allowShopkeepersTrading;
-    }
-
-    public boolean isAllowShopkeepersEditor() {
-        return allowShopkeepersEditor;
-    }
-
-    public boolean isAllowEShulkerBox() {
-        return allowEShulkerBox;
-    }
-
-    public boolean isAllowVirtualShulkerBox() {
-        return allowVirtualShulkerBox;
-    }
-
-    public boolean isAllowSpyPlayerInventory() {
-        return allowSpyPlayerInventory;
-    }
-
-    public boolean isAllowSpyEnderChest() {
-        return allowSpyEnderChest;
-    }
-
-    public boolean isAllowSpyEntityInventory() {
-        return allowSpyEntityInventory;
-    }
-
-    public boolean isAllowCmail() {
-        return allowCmail;
-    }
-
-    public String getAddSuccess() {
-        return addSuccess;
-    }
-
-    public String getAddAlreadyExists() {
-        return addAlreadyExists;
-    }
-
-    public String getAddOverwriteSuccess() {
-        return addOverwriteSuccess;
-    }
-
-    public String getAddAir() {
-        return addAir;
-    }
-
-    public String getAddInvalidName() {
-        return addInvalidName;
-    }
-
-    public String getRemoveSuccess() {
-        return removeSuccess;
-    }
-
-    public String getRemoveNotFound() {
-        return removeNotFound;
-    }
-
-    public String getCheckProtected() {
-        return checkProtected;
-    }
-
-    public String getCheckNotProtected() {
-        return checkNotProtected;
-    }
-
-    public String getListHeader() {
-        return listHeader;
-    }
-
-    public String getListItem() {
-        return listItem;
-    }
-
-    public String getListEmpty() {
-        return listEmpty;
-    }
-
-    public List<String> getHelpMessages() {
-        return Collections.unmodifiableList(helpMessages);
-    }
+    public boolean isDenyDrop() { return denyDrop; }
+    public boolean isDenyOffhand() { return denyOffhand; }
+    public boolean isDenyBlockPlace() { return denyBlockPlace; }
+    public boolean isDenyAltarInteract() { return denyAltarInteract; }
+    public boolean isDenyEntityInteract() { return denyEntityInteract; }
+    public boolean isAllowHopperMove() { return allowHopperMove; }
+    public boolean isAllowHopperPickup() { return allowHopperPickup; }
+    public boolean isPreventDespawn() { return preventDespawn; }
+    public boolean isAllowShopkeepersTrading() { return allowShopkeepersTrading; }
+    public boolean isAllowShopkeepersEditor() { return allowShopkeepersEditor; }
+    public boolean isAllowEShulkerBox() { return allowEShulkerBox; }
+    public boolean isAllowVirtualShulkerBox() { return allowVirtualShulkerBox; }
+    public boolean isAllowSpyPlayerInventory() { return allowSpyPlayerInventory; }
+    public boolean isAllowSpyEnderChest() { return allowSpyEnderChest; }
+    public boolean isAllowSpyEntityInventory() { return allowSpyEntityInventory; }
+    public boolean isAllowCmail() { return allowCmail; }
+    public boolean isActionbarEnabled() { return actionbarEnabled; }
+    public boolean isSoundEnabled() { return soundEnabled; }
+    public Sound getSound() { return sound; }
+    public float getSoundVolume() { return soundVolume; }
+    public float getSoundPitch() { return soundPitch; }
+    public long getCooldownMs() { return cooldownMs; }
+    public boolean isGuiSounds() { return guiSounds; }
+    public boolean isCheckOnStartup() { return checkOnStartup; }
+    public boolean isNotifyOnJoin() { return notifyOnJoin; }
 }

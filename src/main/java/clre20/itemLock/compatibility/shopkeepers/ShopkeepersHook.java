@@ -37,6 +37,14 @@ public interface ShopkeepersHook {
      */
     boolean isShopkeeperBlock(Block block);
 
+    /** 外掛啟用／停用時重新確認是否可用（由 PluginEnable/DisableEvent 呼叫）。 */
+    default void refresh() {
+    }
+
+    /** 外掛正在停用（事件觸發時外掛仍顯示為啟用）。 */
+    default void disable() {
+    }
+
     /**
      * 工廠方法：若伺服器已載入 Shopkeepers 則建立專用 Hook，否則回傳 No-op 實作。
      */

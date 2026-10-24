@@ -6,12 +6,15 @@ import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.feedback.FeedbackService;
+import clre20.itemLock.feedback.FeedbackService.Deny;
 import clre20.itemLock.matcher.ItemMatcher;
-import clre20.itemLock.ItemLock;
+import clre20.itemLock.model.ItemTemplate;
 import clre20.itemLock.security.ContainerWhitelist;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -23,34 +26,39 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.plugin.Plugin;
 
+import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * 介面操作全管道封鎖監聽器 (Inventory Zero-Trust Security)。
- * 當玩家開啟的頂部介面不在純存儲白名單內時，徹底封死所有移入、加工、偷換操作。
- * 支援與 Shopkeepers 插件深度相容（放行交易介面與編輯設定介面）。
- * 支援與 eShulkerBox 等手持/隨身開啟潛影盒插件相容（放行純存儲取放操作）。
- * 支援與 Cmail 郵件插件相容（放行郵件附件的放入與領取）。
+ * 介面操作攔截：頂部介面不是純儲存容器時，禁止把受保護物品放入、交換或在裡面操作。
+ * <p>
+ * 效能：先找出這次點擊涉及的物品（游標、格子、數字鍵、副手）是否受保護，
+ * 都不是就立即返回；相容外掛與容器判斷只在真的涉及受保護物品時才做。
  */
-public class InventorySecurityListener implements Listener {
+public final class InventorySecurityListener implements Listener {
 
+    private final Plugin plugin;
     private final PluginConfig config;
-    private final ItemMatcher itemMatcher;
-    private final FeedbackService feedbackService;
-    private final ShopkeepersHook shopkeepersHook;
-    private final EShulkerBoxHook eshulkerBoxHook;
-    private final AdvancedSpyInventoryHook spyInventoryHook;
+    private final ItemMatcher matcher;
+    private final FeedbackService feedback;
+    private final ShopkeepersHook shopkeepers;
+    private final EShulkerBoxHook eShulkerBox;
+    private final AdvancedSpyInventoryHook spyInventory;
 
-    public InventorySecurityListener(PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService,
-                                     ShopkeepersHook shopkeepersHook, EShulkerBoxHook eshulkerBoxHook,
-                                     AdvancedSpyInventoryHook spyInventoryHook) {
+    public InventorySecurityListener(Plugin plugin, PluginConfig config, ItemMatcher matcher, FeedbackService feedback,
+                                     ShopkeepersHook shopkeepers, EShulkerBoxHook eShulkerBox,
+                                     AdvancedSpyInventoryHook spyInventory) {
+        this.plugin = plugin;
         this.config = config;
-        this.itemMatcher = itemMatcher;
-        this.feedbackService = feedbackService;
-        this.shopkeepersHook = shopkeepersHook;
-        this.eshulkerBoxHook = eshulkerBoxHook;
-        this.spyInventoryHook = spyInventoryHook;
+        this.matcher = matcher;
+        this.feedback = feedback;
+        this.shopkeepers = shopkeepers;
+        this.eShulkerBox = eShulkerBox;
+        this.spyInventory = spyInventory;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -58,125 +66,92 @@ public class InventorySecurityListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
+        ClickType click = event.getClick();
+        PlayerInventory playerInv = player.getInventory();
+        ItemStack cursor = event.getCursor();
+        ItemStack current = event.getCurrentItem();
 
-        Inventory topInventory = event.getView().getTopInventory();
-        Inventory clickedInventory = event.getClickedInventory();
+        ItemTemplate tCursor = matcher.find(cursor);
+        ItemTemplate tCurrent = matcher.find(current);
+        ItemTemplate tHotbar = null;
+        if (click == ClickType.NUMBER_KEY) {
+            int button = event.getHotbarButton();
+            if (button >= 0 && button < 9) {
+                tHotbar = matcher.find(playerInv.getItem(button));
+            }
+        }
+        ItemTemplate tOffhand = click == ClickType.SWAP_OFFHAND ? matcher.find(playerInv.getItemInOffHand()) : null;
+
+        // 最常見的情況：沒有任何受保護物品參與
+        if (tCursor == null && tCurrent == null && tHotbar == null && tOffhand == null) {
+            return;
+        }
+
+        InventoryView view = event.getView();
+        Inventory top = view.getTopInventory();
+        if (isShopkeepersAllowed(player, top)) {
+            return;
+        }
+
+        Inventory clicked = event.getClickedInventory();
         int rawSlot = event.getRawSlot();
 
-        // 檢查是否處於允許的 Shopkeepers 介面中（交易或編輯介面）
-        if (isShopkeepersAllowed(player, topInventory)) {
-            return;
-        }
-
-        // 檢查副手槽位放入防護 (PlayerInventory Slot 40 或 CraftingView / Creative RawSlot 45)
-        if (isOffhandSlot(event)) {
-            ItemStack cursor = event.getCursor();
-            if (itemMatcher.isDenyOffhand(cursor, config)) {
-                cancelAndFeedback(event, player, config.getDenyOffhandMessage());
-                if (player.getGameMode() == GameMode.CREATIVE) {
-                    restoreCreativeItem(player, cursor);
-                }
+        // 副手槽
+        if (isOffhandSlot(clicked, event.getSlot(), rawSlot, top)) {
+            if (denyOffhand(tCursor)) {
+                cancel(event, player, Deny.OFFHAND);
+                restoreIfCreative(player, cursor);
                 return;
             }
-            if (event.getClick() == ClickType.NUMBER_KEY) {
-                int hotbarSlot = event.getHotbarButton();
-                if (hotbarSlot >= 0 && hotbarSlot < 9) {
-                    ItemStack hotbarItem = player.getInventory().getItem(hotbarSlot);
-                    if (itemMatcher.isDenyOffhand(hotbarItem, config)) {
-                        cancelAndFeedback(event, player, config.getDenyOffhandMessage());
-                        return;
-                    }
-                }
+            if (denyOffhand(tHotbar)) {
+                cancel(event, player, Deny.OFFHAND);
+                return;
             }
         }
 
-        // 介面內按 F 換手 (SWAP_OFFHAND)：游標所指的物品會被換入副手
-        // (此操作不會觸發 PlayerSwapHandItemsEvent，必須在此攔截)
-        if (event.getClick() == ClickType.SWAP_OFFHAND && itemMatcher.isDenyOffhand(event.getCurrentItem(), config)) {
-            cancelAndFeedback(event, player, config.getDenyOffhandMessage());
+        // 在介面中按 F：游標下的物品換到副手（不會觸發 PlayerSwapHandItemsEvent）
+        if (click == ClickType.SWAP_OFFHAND && denyOffhand(tCurrent)) {
+            cancel(event, player, Deny.OFFHAND);
             return;
         }
 
-        boolean isTopPureStorage = isPureStorage(player, event.getView());
-        boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
+        boolean survivalCrafting = top.getType() == InventoryType.CRAFTING;
 
-        // 情況 A：點擊頂部介面（Top Inventory）
-        if (clickedInventory != null && clickedInventory.equals(topInventory)) {
-            // 如果頂部介面不是純存儲容器
-            if (!isTopPureStorage) {
-                // 若為隨身 2x2 背包介面，僅封鎖合成槽（0 ~ 4 槽位：0 為產物，1~4 為合成矩陣）
-                if (isSurvivalCrafting && rawSlot > 4) {
-                    return;
-                }
-
-                // 1. 滑鼠點擊放入或交換（Cursor Drop / Place / Swap）
-                ItemStack cursor = event.getCursor();
-                if (itemMatcher.isProtected(cursor)) {
-                    cancelAndFeedback(event, player);
-                    if (player.getGameMode() == GameMode.CREATIVE) {
-                        restoreCreativeItem(player, cursor);
-                    }
-                    return;
-                }
-
-                // 2. 數字鍵偷換（Hotbar Swap 1~9）
-                if (event.getClick() == ClickType.NUMBER_KEY) {
-                    int hotbarSlot = event.getHotbarButton();
-                    if (hotbarSlot >= 0 && hotbarSlot < 9) {
-                        ItemStack hotbarItem = player.getInventory().getItem(hotbarSlot);
-                        if (itemMatcher.isProtected(hotbarItem)) {
-                            cancelAndFeedback(event, player);
-                            return;
-                        }
-                    }
-                }
-
-                // 2-1. 按 F 將副手物品換入頂部介面（Offhand Swap）
-                if (event.getClick() == ClickType.SWAP_OFFHAND) {
-                    ItemStack offhandItem = player.getInventory().getItemInOffHand();
-                    if (itemMatcher.isProtected(offhandItem)) {
-                        cancelAndFeedback(event, player);
-                        return;
-                    }
-                }
-
-                // 3. 槽位內已存在受保護物品（防止在非純存儲介面內進行任何操作或取出加工）
-                ItemStack current = event.getCurrentItem();
-                if (itemMatcher.isProtected(current)) {
-                    cancelAndFeedback(event, player);
-                    return;
-                }
+        if (clicked != null && clicked.equals(top)) {
+            // 隨身 2x2 合成介面只管合成格（0 產物、1~4 材料）
+            if (survivalCrafting && rawSlot > 4) {
+                return;
             }
+            if (isPureStorage(player, view)) {
+                return;
+            }
+            if (tCursor != null) {
+                cancel(event, player, Deny.DEFAULT);
+                restoreIfCreative(player, cursor);
+                return;
+            }
+            if (tHotbar != null || tOffhand != null || tCurrent != null) {
+                cancel(event, player, Deny.DEFAULT);
+            }
+            return;
         }
 
-        // 情況 B：點擊底部玩家背包介面（Bottom Inventory）進行 Shift 快速移入
-        if (clickedInventory != null && !clickedInventory.equals(topInventory)) {
-            if (event.isShiftClick()) {
-                ItemStack current = event.getCurrentItem();
-                if (itemMatcher.isProtected(current)) {
-                    // 若頂部介面非純存儲容器，一律禁止 Shift 移入
-                    if (!isTopPureStorage && !isSurvivalCrafting) {
-                        cancelAndFeedback(event, player);
-                        return;
-                    }
-                }
-
-                // 防範透過 Shift-Click 將上鎖盾牌快捷穿戴入副手槽
-                if (current != null && current.getType() == org.bukkit.Material.SHIELD && itemMatcher.isDenyOffhand(current, config)) {
-                    if (player.getInventory().getItemInOffHand().getType().isAir()) {
-                        cancelAndFeedback(event, player, config.getDenyOffhandMessage());
-                        return;
-                    }
-                }
-            }
-
-            // 雙擊收集（DOUBLE_CLICK / COLLECT_TO_CURSOR）
-            if (event.getAction() == InventoryAction.COLLECT_TO_CURSOR) {
-                ItemStack cursor = event.getCursor();
-                if (itemMatcher.isProtected(cursor) && !isTopPureStorage && !isSurvivalCrafting) {
-                    cancelAndFeedback(event, player);
+        if (clicked != null) {
+            if (event.isShiftClick() && tCurrent != null) {
+                if (!survivalCrafting && !isPureStorage(player, view)) {
+                    cancel(event, player, Deny.DEFAULT);
                     return;
                 }
+                // Shift 點擊把盾牌直接穿到副手
+                if (current.getType() == Material.SHIELD && denyOffhand(tCurrent)
+                        && playerInv.getItemInOffHand().getType().isAir()) {
+                    cancel(event, player, Deny.OFFHAND);
+                    return;
+                }
+            }
+            if (event.getAction() == InventoryAction.COLLECT_TO_CURSOR && tCursor != null
+                    && !survivalCrafting && !isPureStorage(player, view)) {
+                cancel(event, player, Deny.DEFAULT);
             }
         }
     }
@@ -186,198 +161,130 @@ public class InventorySecurityListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-
-        Inventory topInventory = event.getView().getTopInventory();
-        int topSize = topInventory.getSize();
-
-        // 檢查是否處於允許的 Shopkeepers 介面中（交易或編輯介面）
-        if (isShopkeepersAllowed(player, topInventory)) {
+        ItemStack oldCursor = event.getOldCursor();
+        ItemTemplate template = matcher.find(oldCursor);
+        if (template == null) {
+            // 拖曳放下的物品都是同一種，看第一個即可
+            Iterator<ItemStack> it = event.getNewItems().values().iterator();
+            if (it.hasNext()) {
+                template = matcher.find(it.next());
+            }
+        }
+        if (template == null) {
             return;
         }
 
-        // 檢查拖曳是否涉及副手槽位
-        for (int rawSlot : event.getRawSlots()) {
-            if (isOffhandRawSlot(event.getView(), rawSlot)) {
-                ItemStack oldCursor = event.getOldCursor();
-                if (itemMatcher.isDenyOffhand(oldCursor, config)) {
-                    cancelAndFeedback(event, player, config.getDenyOffhandMessage());
-                    if (player.getGameMode() == GameMode.CREATIVE) {
-                        restoreCreativeItem(player, oldCursor);
-                    }
+        InventoryView view = event.getView();
+        Inventory top = view.getTopInventory();
+        if (isShopkeepersAllowed(player, top)) {
+            return;
+        }
+
+        if (denyOffhand(template)) {
+            for (int rawSlot : event.getRawSlots()) {
+                if (isOffhandRawSlot(view, rawSlot)) {
+                    cancel(event, player, Deny.OFFHAND);
+                    restoreIfCreative(player, oldCursor);
                     return;
                 }
-                for (ItemStack newItem : event.getNewItems().values()) {
-                    if (itemMatcher.isDenyOffhand(newItem, config)) {
-                        cancelAndFeedback(event, player, config.getDenyOffhandMessage());
-                        if (player.getGameMode() == GameMode.CREATIVE) {
-                            restoreCreativeItem(player, oldCursor);
-                        }
-                        return;
-                    }
-                }
             }
         }
 
-        boolean isTopPureStorage = isPureStorage(player, event.getView());
-        boolean isSurvivalCrafting = topInventory.getType() == InventoryType.CRAFTING;
-
-        // 若頂部介面已是純存儲容器，且不是隨身合成欄位，則放行
-        if (isTopPureStorage) {
+        if (isPureStorage(player, view)) {
             return;
         }
-
-        // 檢查拖曳的物品是否受保護
-        ItemStack oldCursor = event.getOldCursor();
-        boolean cursorProtected = itemMatcher.isProtected(oldCursor);
-
-        if (!cursorProtected) {
-            for (ItemStack newItem : event.getNewItems().values()) {
-                if (itemMatcher.isProtected(newItem)) {
-                    cursorProtected = true;
-                    break;
-                }
-            }
-        }
-
-        if (!cursorProtected) {
-            return;
-        }
-
-        // 檢查拖曳目標槽位是否包含非純存儲的頂部介面槽位
+        boolean survivalCrafting = top.getType() == InventoryType.CRAFTING;
+        int topSize = top.getSize();
         for (int rawSlot : event.getRawSlots()) {
-            if (rawSlot < topSize) {
-                // 如果是隨身 2x2，僅攔截 0 ~ 4 槽位
-                if (isSurvivalCrafting && rawSlot > 4) {
-                    continue;
-                }
-                // 拖拉塗抹涉及非純存儲頂部介面，立即取消
-                cancelAndFeedback(event, player);
-                if (player.getGameMode() == GameMode.CREATIVE) {
-                    restoreCreativeItem(player, oldCursor);
-                }
+            if (rawSlot < topSize && !(survivalCrafting && rawSlot > 4)) {
+                cancel(event, player, Deny.DEFAULT);
+                restoreIfCreative(player, oldCursor);
                 return;
             }
         }
     }
 
-    /**
-     * 判定指定介面是否為純存儲容器（含真實方塊容器、末影箱、隨身背包、受相容的虛擬/手持潛影盒、AdvancedSpyInventory 及 Cmail 介面）。
-     */
+    private boolean denyOffhand(ItemTemplate t) {
+        return t != null && t.getSettings().isDenyOffhand(config);
+    }
+
+    /** 頂部介面是否算純儲存（方塊容器、末影箱、背包，或相容外掛的介面）。 */
     private boolean isPureStorage(Player player, InventoryView view) {
-        Inventory topInventory = view.getTopInventory();
-        if (ContainerWhitelist.isPureStorage(topInventory, config.isAllowVirtualShulkerBox())) {
+        Inventory top = view.getTopInventory();
+        if (ContainerWhitelist.isPureStorage(top, config.isAllowVirtualShulkerBox())) {
             return true;
         }
-
-        // AdvancedSpyInventory 查看背包 / 末影箱 / 生物背包介面相容判定
-        if (isSpyInventoryAllowed(view)) {
+        if (spyInventory.isAvailable()) {
+            boolean allowed = switch (spyInventory.getSpyType(view)) {
+                case PLAYER -> config.isAllowSpyPlayerInventory();
+                case ENDER_CHEST -> config.isAllowSpyEnderChest();
+                case ENTITY -> config.isAllowSpyEntityInventory();
+                case NONE -> false;
+            };
+            if (allowed) {
+                return true;
+            }
+        }
+        if (config.isAllowEShulkerBox() && eShulkerBox.isEShulkerBoxOpen(player, top)) {
             return true;
         }
-
-        // eShulkerBox 手持/隨身開啟潛影盒相容判定
-        if (config.isAllowEShulkerBox() && eshulkerBoxHook.isEShulkerBoxOpen(player, topInventory)) {
-            return true;
-        }
-
-        // Cmail 郵件介面相容判定（寄送附件、領取附件等）
-        if (config.isAllowCmail() && CmailCompat.isCmailInventory(topInventory)) {
-            return true;
-        }
-
-        // 虛擬潛影盒通用開關判定
-        if (config.isAllowVirtualShulkerBox() && ContainerWhitelist.isVirtualShulkerBox(topInventory)) {
-            return true;
-        }
-
-        return false;
+        return config.isAllowCmail() && CmailCompat.isCmailInventory(top);
     }
 
-    private boolean isSpyInventoryAllowed(InventoryView view) {
-        return switch (spyInventoryHook.getSpyType(view)) {
-            case PLAYER -> config.isAllowSpyPlayerInventory();
-            case ENDER_CHEST -> config.isAllowSpyEnderChest();
-            case ENTITY -> config.isAllowSpyEntityInventory();
-            case NONE -> false;
-        };
-    }
-
-    private boolean isShopkeepersAllowed(Player player, Inventory topInventory) {
-        if (!shopkeepersHook.isAvailable()) {
+    private boolean isShopkeepersAllowed(Player player, Inventory top) {
+        if (!shopkeepers.isAvailable()) {
             return false;
         }
-        if (config.isAllowShopkeepersTrading() && shopkeepersHook.isShopkeepersTrading(player, topInventory)) {
-            return true;
-        }
-        if (config.isAllowShopkeepersEditor() && shopkeepersHook.isShopkeepersEditor(player, topInventory)) {
-            return true;
-        }
-        return false;
+        return (config.isAllowShopkeepersTrading() && shopkeepers.isShopkeepersTrading(player, top))
+                || (config.isAllowShopkeepersEditor() && shopkeepers.isShopkeepersEditor(player, top));
     }
 
-    private boolean isOffhandSlot(InventoryClickEvent event) {
-        // 僅玩家背包的 Slot 40 為副手槽（大箱子等頂部介面的第 40 格不可誤判）
-        Inventory clicked = event.getClickedInventory();
-        if (clicked != null && clicked.getType() == InventoryType.PLAYER && event.getSlot() == 40) {
+    private static boolean isOffhandSlot(Inventory clicked, int slot, int rawSlot, Inventory top) {
+        // 只有玩家背包的第 40 格是副手（大箱子的第 40 格不算）
+        if (clicked != null && clicked.getType() == InventoryType.PLAYER && slot == 40) {
             return true;
         }
-        // 在原版隨身 2x2 合成介面 (CraftingView) 或創造模式生存分頁中，副手槽為 rawSlot 45
-        int rawSlot = event.getRawSlot();
         if (rawSlot == 45) {
-            InventoryType topType = event.getView().getTopInventory().getType();
-            if (topType == InventoryType.CRAFTING || topType == InventoryType.CREATIVE) {
-                return true;
-            }
+            InventoryType type = top.getType();
+            return type == InventoryType.CRAFTING || type == InventoryType.CREATIVE;
         }
         return false;
     }
 
-    private boolean isOffhandRawSlot(org.bukkit.inventory.InventoryView view, int rawSlot) {
-        InventoryType topType = view.getTopInventory().getType();
-        if ((topType == InventoryType.CRAFTING || topType == InventoryType.CREATIVE) && rawSlot == 45) {
+    private static boolean isOffhandRawSlot(InventoryView view, int rawSlot) {
+        Inventory top = view.getTopInventory();
+        InventoryType type = top.getType();
+        if ((type == InventoryType.CRAFTING || type == InventoryType.CREATIVE) && rawSlot == 45) {
             return true;
         }
-        int topSize = view.getTopInventory().getSize();
-        if (rawSlot >= topSize) {
-            int slotInBottom = view.convertSlot(rawSlot);
-            if (slotInBottom == 40) {
-                return true;
-            }
-        }
-        return false;
+        return rawSlot >= top.getSize() && view.convertSlot(rawSlot) == 40;
     }
 
     /**
-     * 創造模式專屬防遺失返還機制：
-     * 在創造模式下，客戶端在拖曳/點擊被伺服端取消時會自動抹除游標物品且不接收游標同步封包，
-     * 因此透過排程在下一個 Tick 將物品安全歸還至玩家主背包或快捷欄，若背包滿則安全掉落在腳下。
+     * 創造模式下取消點擊時，客戶端會把游標物品刪掉；下一 tick 把物品還給玩家（背包滿則掉在腳下）。
      */
-    private void restoreCreativeItem(Player player, ItemStack item) {
-        if (item == null || item.getType().isAir()) {
+    private void restoreIfCreative(Player player, ItemStack item) {
+        if (player.getGameMode() != GameMode.CREATIVE || item == null || item.getType().isAir()) {
             return;
         }
-        ItemStack restoreItem = item.clone();
-        Bukkit.getScheduler().runTask(ItemLock.getInstance(), () -> {
-            if (!player.isOnline()) {
+        ItemStack copy = item.clone();
+        UUID id = player.getUniqueId();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) {
                 return;
             }
-            player.setItemOnCursor(null);
-            Map<Integer, ItemStack> leftover = player.getInventory().addItem(restoreItem);
-            if (!leftover.isEmpty()) {
-                for (ItemStack drop : leftover.values()) {
-                    player.getWorld().dropItem(player.getLocation(), drop);
-                }
+            p.setItemOnCursor(null);
+            Map<Integer, ItemStack> left = p.getInventory().addItem(copy);
+            for (ItemStack drop : left.values()) {
+                p.getWorld().dropItem(p.getLocation(), drop);
             }
-            player.updateInventory();
+            p.updateInventory();
         });
     }
 
-    private void cancelAndFeedback(org.bukkit.event.Cancellable event, Player player) {
-        cancelAndFeedback(event, player, null);
-    }
-
-    private void cancelAndFeedback(org.bukkit.event.Cancellable event, Player player, String customMessage) {
+    private void cancel(Cancellable event, Player player, Deny type) {
         event.setCancelled(true);
-        feedbackService.sendDenyFeedback(player, customMessage);
-        feedbackService.syncInventoryNextTick(player);
+        feedback.deny(player, type);
     }
 }

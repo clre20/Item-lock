@@ -12,30 +12,41 @@ import org.bukkit.inventory.Inventory;
  */
 public class DynamicShopkeepersHook implements ShopkeepersHook {
 
-    private ShopkeepersHook delegate;
+    private volatile ShopkeepersHook delegate;
     private boolean loggedHook = false;
 
-    private ShopkeepersHook getDelegate() {
-        if (delegate != null && delegate.isAvailable()) {
-            return delegate;
-        }
+    public DynamicShopkeepersHook() {
+        refresh();
+    }
 
+    @Override
+    public void disable() {
+        delegate = null;
+    }
+
+    /** 只在啟動與外掛啟用／停用時檢查，事件中不再查詢外掛列表。 */
+    @Override
+    public void refresh() {
+        ShopkeepersHook hook = null;
         if (Bukkit.getPluginManager().isPluginEnabled("Shopkeepers")) {
             try {
                 Class.forName("com.nisovin.shopkeepers.api.ShopkeepersAPI");
                 if (com.nisovin.shopkeepers.api.ShopkeepersAPI.isEnabled()) {
-                    this.delegate = new ShopkeepersHookImpl();
+                    hook = new ShopkeepersHookImpl();
                     if (!loggedHook) {
                         loggedHook = true;
-                        clre20.itemLock.util.Log.hook("已成功動態掛接 <white>Shopkeepers</white> 插件！");
+                        clre20.itemLock.util.Log.console("console.hooked", "plugin", "Shopkeepers");
                     }
-                    return this.delegate;
                 }
             } catch (Throwable ignored) {
             }
         }
+        this.delegate = hook;
+    }
 
-        return null;
+    private ShopkeepersHook getDelegate() {
+        ShopkeepersHook d = delegate;
+        return d != null && d.isAvailable() ? d : null;
     }
 
     @Override

@@ -1,226 +1,256 @@
 package clre20.itemLock.command;
 
-import clre20.itemLock.config.PluginConfig;
-import clre20.itemLock.matcher.ItemMatcher;
-import clre20.itemLock.matcher.MatchResult;
+import clre20.itemLock.ItemLock;
+import clre20.itemLock.config.Messages;
+import clre20.itemLock.gui.TemplateListGui;
+import clre20.itemLock.gui.TemplateSettingsGui;
 import clre20.itemLock.model.ItemTemplate;
 import clre20.itemLock.template.TemplateManager;
-import net.kyori.adventure.text.Component;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
 
 /**
- * ItemLock 主指令處理器。
- * 權限節點: itemlock.admin (預設 OP Level 2)
+ * /itemlock 指令與 Tab 補全。每個子指令有自己的權限；說明與補全只列出有權限的項目。
  */
-public class ItemLockCommand implements CommandExecutor {
+public final class ItemLockCommand implements TabExecutor {
 
-    private final PluginConfig config;
-    private final TemplateManager templateManager;
-    private final ItemMatcher itemMatcher;
+    private record Sub(String name, String permission, String usage) {}
 
-    public ItemLockCommand(PluginConfig config, TemplateManager templateManager, ItemMatcher itemMatcher) {
-        this.config = config;
-        this.templateManager = templateManager;
-        this.itemMatcher = itemMatcher;
+    private static final List<Sub> SUBS = List.of(
+            new Sub("help", Perm.HELP, "/itemlock help"),
+            new Sub("gui", Perm.LIST, "/itemlock gui"),
+            new Sub("list", Perm.LIST, "/itemlock list"),
+            new Sub("edit", Perm.EDIT, "/itemlock edit <名稱>"),
+            new Sub("add", Perm.ADD, "/itemlock add <名稱> [-f]"),
+            new Sub("remove", Perm.REMOVE, "/itemlock remove <名稱>"),
+            new Sub("check", Perm.CHECK, "/itemlock check"),
+            new Sub("reload", Perm.RELOAD, "/itemlock reload"),
+            new Sub("version", Perm.VERSION, "/itemlock version")
+    );
+
+    private final ItemLock plugin;
+
+    public ItemLockCommand(ItemLock plugin) {
+        this.plugin = plugin;
+    }
+
+    private Messages msg() {
+        return plugin.getMessages();
+    }
+
+    private TemplateManager templates() {
+        return plugin.getTemplateManager();
+    }
+
+    private static Sub find(String name) {
+        for (Sub s : SUBS) {
+            if (s.name().equals(name)) {
+                return s;
+            }
+        }
+        return null;
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!sender.hasPermission("itemlock.admin")) {
-            sendMessage(sender, config.getNoPermission());
+        String name = args.length == 0 ? "help" : args[0].toLowerCase(Locale.ROOT);
+        if (name.equals("delete")) {
+            name = "remove";
+        }
+        Sub sub = find(name);
+        if (sub == null) {
+            msg().send(sender, "command.unknown", "label", label);
             return true;
         }
-
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
-            handleHelp(sender);
+        if (!sender.hasPermission(sub.permission())) {
+            msg().send(sender, "command.no-permission");
             return true;
         }
-
-        String subCommand = args[0].toLowerCase();
-        switch (subCommand) {
-            case "add" -> handleAdd(sender, args);
-            case "remove" -> handleRemove(sender, args);
-            case "check" -> handleCheck(sender);
-            case "list" -> handleList(sender);
-            case "gui" -> handleGui(sender);
-            case "edit" -> handleEdit(sender, args);
-            case "reload" -> handleReload(sender);
-            default -> {
-                sendMessage(sender, "<red>未知的子指令！請使用 <yellow>/" + label + " help</yellow> 查看說明。</red>");
-            }
+        switch (sub.name()) {
+            case "help" -> help(sender);
+            case "gui", "list" -> list(sender);
+            case "edit" -> edit(sender, args);
+            case "add" -> add(sender, args);
+            case "remove" -> remove(sender, args);
+            case "check" -> check(sender);
+            case "reload" -> reload(sender);
+            case "version" -> plugin.getUpdateChecker().reply(sender);
+            default -> { }
         }
-
         return true;
     }
 
-    private void handleHelp(CommandSender sender) {
-        for (String line : config.getHelpMessages()) {
-            sendMessage(sender, line);
-        }
-    }
-
-    private void handleAdd(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sendMessage(sender, config.getPlayerOnly());
-            return;
-        }
-
-        if (args.length < 2) {
-            sendMessage(sender, "<red>請指定樣本名稱！用法: <yellow>/itemlock add <名稱></yellow></red>");
-            return;
-        }
-
-        String name = args[1];
-        if (!templateManager.isValidId(name)) {
-            sendMessage(sender, config.getAddInvalidName());
-            return;
-        }
-
-        ItemStack handItem = player.getInventory().getItemInMainHand();
-        if (handItem.getType().isAir()) {
-            sendMessage(sender, config.getAddAir());
-            return;
-        }
-
-        boolean alreadyExists = templateManager.hasTemplate(name);
-        if (alreadyExists) {
-            boolean isForce = args.length >= 3 && (
-                    args[2].equalsIgnoreCase("-f") ||
-                    args[2].equalsIgnoreCase("--force") ||
-                    args[2].equalsIgnoreCase("force")
-            );
-            if (!isForce) {
-                String msg = config.getAddAlreadyExists().replace("<id>", name);
-                sendMessage(sender, msg);
-                return;
+    private void help(CommandSender sender) {
+        msg().sendPlain(sender, "command.help-header", "version", plugin.getUpdateChecker().getCurrent());
+        for (Sub s : SUBS) {
+            if (sender.hasPermission(s.permission())) {
+                msg().sendPlain(sender, "command.help-line", "usage", s.usage(), "desc", msg().raw("command.help." + s.name()));
             }
         }
-
-        try {
-            ItemTemplate template = templateManager.saveTemplate(name, handItem);
-            String templateMsg = alreadyExists ? config.getAddOverwriteSuccess() : config.getAddSuccess();
-            String msg = templateMsg
-                    .replace("<id>", template.getId())
-                    .replace("<material>", template.getMaterial().name());
-            sendMessage(sender, msg);
-        } catch (IOException e) {
-            sendMessage(sender, "<red>儲存保護樣本檔案失敗: " + e.getMessage() + "</red>");
-        }
     }
 
-    private void handleRemove(CommandSender sender, String[] args) {
-        if (args.length < 2) {
-            sendMessage(sender, "<red>請指定要刪除的樣本名稱！用法: <yellow>/itemlock remove <名稱></yellow></red>");
-            return;
-        }
-
-        String name = args[1];
-        if (templateManager.removeTemplate(name)) {
-            String msg = config.getRemoveSuccess().replace("<id>", name);
-            sendMessage(sender, msg);
-        } else {
-            String msg = config.getRemoveNotFound().replace("<id>", name);
-            sendMessage(sender, msg);
-        }
-    }
-
-    private void handleCheck(CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            sendMessage(sender, config.getPlayerOnly());
-            return;
-        }
-
-        ItemStack handItem = player.getInventory().getItemInMainHand();
-        if (handItem.getType().isAir()) {
-            sendMessage(sender, "<red>主手不可為空！請手持欲檢測的物品。</red>");
-            return;
-        }
-
-        MatchResult result = itemMatcher.match(handItem);
-        if (result.matched() && result.getTemplate().isPresent()) {
-            ItemTemplate template = result.getTemplate().get();
-            String msg = config.getCheckProtected()
-                    .replace("<id>", template.getId())
-                    .replace("<material>", template.getMaterial().name());
-            sendMessage(sender, msg);
-        } else {
-            sendMessage(sender, config.getCheckNotProtected());
-        }
-    }
-
-    private void handleList(CommandSender sender) {
+    private void list(CommandSender sender) {
         if (sender instanceof Player player) {
-            new clre20.itemLock.gui.TemplateListGui(templateManager, config, 0).open(player);
+            new TemplateListGui(plugin, 0).open(player);
             return;
         }
-
-        Map<String, ItemTemplate> templates = templateManager.getAllTemplates();
-        if (templates.isEmpty()) {
-            sendMessage(sender, config.getListEmpty());
+        List<ItemTemplate> all = new ArrayList<>(templates().getAll());
+        if (all.isEmpty()) {
+            msg().send(sender, "command.list-empty");
             return;
         }
-
-        String header = config.getListHeader().replace("<count>", String.valueOf(templates.size()));
-        sendMessage(sender, header);
-
-        for (ItemTemplate template : templates.values()) {
-            String fileName = template.getId() + ".yml";
-            String itemLine = config.getListItem()
-                    .replace("<id>", template.getId())
-                    .replace("<material>", template.getMaterial().name())
-                    .replace("<file>", fileName);
-            sendMessage(sender, itemLine);
+        all.sort(Comparator.comparing(ItemTemplate::getId, String.CASE_INSENSITIVE_ORDER));
+        msg().send(sender, "command.list-header", "count", all.size());
+        for (ItemTemplate t : all) {
+            msg().sendPlain(sender, "command.list-item", "id", t.getId(), "material", t.getMaterial().name());
         }
     }
 
-    private void handleGui(CommandSender sender) {
+    private void edit(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
-            sendMessage(sender, config.getPlayerOnly());
+            msg().send(sender, "command.player-only");
             return;
         }
-        new clre20.itemLock.gui.TemplateListGui(templateManager, config, 0).open(player);
-    }
-
-    private void handleEdit(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sendMessage(sender, config.getPlayerOnly());
-            return;
-        }
-
         if (args.length < 2) {
-            sendMessage(sender, "<red>請指定要編輯的樣本名稱！用法: <yellow>/itemlock edit <名稱></yellow></red>");
+            msg().send(sender, "command.usage", "usage", "/itemlock edit <名稱>");
             return;
         }
-
-        String name = args[1];
-        var opt = templateManager.getTemplate(name);
-        if (opt.isEmpty()) {
-            sendMessage(sender, config.getRemoveNotFound().replace("<id>", name));
+        String id = args[1];
+        if (!templates().hasTemplate(id)) {
+            msg().send(sender, "command.not-found", "id", id);
             return;
         }
-
-        new clre20.itemLock.gui.TemplateSettingsGui(templateManager, config, opt.get(), 0).open(player);
+        new TemplateSettingsGui(plugin, id, 0).open(player);
     }
 
-    private void handleReload(CommandSender sender) {
-        config.load();
-        templateManager.loadAll();
-        int count = templateManager.getAllTemplates().size();
-        String msg = config.getReloadSuccess().replace("<count>", String.valueOf(count));
-        sendMessage(sender, msg);
+    private void add(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            msg().send(sender, "command.player-only");
+            return;
+        }
+        if (args.length < 2) {
+            msg().send(sender, "command.usage", "usage", "/itemlock add <名稱> [-f]");
+            return;
+        }
+        String id = args[1];
+        if (!templates().isValidNewId(id)) {
+            msg().send(sender, "command.invalid-id");
+            return;
+        }
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand.getType().isAir()) {
+            msg().send(sender, "command.hand-empty");
+            return;
+        }
+        boolean exists = templates().hasTemplate(id);
+        boolean force = args.length >= 3 && (args[2].equalsIgnoreCase("-f") || args[2].equalsIgnoreCase("--force"));
+        if (exists && !force) {
+            msg().send(sender, "command.add-exists", "id", id);
+            return;
+        }
+        try {
+            templates().saveTemplate(id, hand);
+        } catch (RuntimeException e) {
+            plugin.getLogger().warning("儲存樣本失敗 " + id + "：" + e);
+            msg().send(sender, "command.save-failed");
+            return;
+        }
+        msg().send(sender, exists ? "command.add-overwrite" : "command.add-success", "id", id);
     }
 
-    private void sendMessage(CommandSender sender, String message) {
-        Component component = config.parseComponent(config.getPrefix() + message);
-        sender.sendMessage(component);
+    private void remove(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            msg().send(sender, "command.usage", "usage", "/itemlock remove <名稱>");
+            return;
+        }
+        String id = args[1];
+        if (templates().removeTemplate(id)) {
+            msg().send(sender, "command.remove-success", "id", id);
+        } else {
+            msg().send(sender, "command.not-found", "id", id);
+        }
+    }
+
+    private void check(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            msg().send(sender, "command.player-only");
+            return;
+        }
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand.getType().isAir()) {
+            msg().send(sender, "command.hand-empty");
+            return;
+        }
+        ItemTemplate t = plugin.getItemMatcher().find(hand);
+        if (t != null) {
+            msg().send(sender, "command.check-protected", "id", t.getId());
+        } else {
+            msg().send(sender, "command.check-not-protected");
+        }
+    }
+
+    private void reload(CommandSender sender) {
+        int count = plugin.reloadAll();
+        msg().send(sender, "command.reload", "count", count);
+    }
+
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
+        List<String> out = new ArrayList<>();
+        if (args.length == 1) {
+            String prefix = args[0].toLowerCase(Locale.ROOT);
+            for (Sub s : SUBS) {
+                if (s.name().startsWith(prefix) && sender.hasPermission(s.permission())) {
+                    out.add(s.name());
+                }
+            }
+            return out;
+        }
+        String name = args[0].toLowerCase(Locale.ROOT);
+        if (name.equals("delete")) {
+            name = "remove";
+        }
+        Sub sub = find(name);
+        if (sub == null || !sender.hasPermission(sub.permission())) {
+            return out;
+        }
+        if (args.length == 2) {
+            String prefix = args[1].toLowerCase(Locale.ROOT);
+            switch (sub.name()) {
+                case "edit", "remove" -> {
+                    for (String id : templates().getIds()) {
+                        if (id.toLowerCase(Locale.ROOT).startsWith(prefix)) {
+                            out.add(id);
+                        }
+                    }
+                    out.sort(String.CASE_INSENSITIVE_ORDER);
+                }
+                case "add" -> {
+                    if (sender instanceof Player player) {
+                        ItemStack hand = player.getInventory().getItemInMainHand();
+                        if (!hand.getType().isAir()) {
+                            String suggestion = hand.getType().name().toLowerCase(Locale.ROOT);
+                            if (suggestion.startsWith(prefix)) {
+                                out.add(suggestion);
+                            }
+                        }
+                    }
+                }
+                default -> { }
+            }
+        } else if (args.length == 3 && sub.name().equals("add") && templates().hasTemplate(args[1])
+                && "-f".startsWith(args[2].toLowerCase(Locale.ROOT))) {
+            out.add("-f");
+        }
+        return out;
     }
 }

@@ -35,6 +35,14 @@ public interface AdvancedSpyInventoryHook {
      */
     SpyType getSpyType(InventoryView view);
 
+    /** 外掛啟用／停用時重新確認是否可用（由 PluginEnable/DisableEvent 呼叫）。 */
+    default void refresh() {
+    }
+
+    /** 外掛正在停用（事件觸發時外掛仍顯示為啟用）。 */
+    default void disable() {
+    }
+
     /**
      * 工廠方法：建立具備延遲動態掛接能力的 Hook，失敗時回傳 No-op 實作。
      */

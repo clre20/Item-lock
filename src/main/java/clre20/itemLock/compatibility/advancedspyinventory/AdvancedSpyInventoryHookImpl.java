@@ -21,9 +21,27 @@ public class AdvancedSpyInventoryHookImpl implements AdvancedSpyInventoryHook {
     private Class<?> enderChestInventoryClass;
     private ClassLoader hookedClassLoader;
     private boolean loggedHook = false;
+    private volatile boolean available;
 
     public AdvancedSpyInventoryHookImpl() {
-        initReflection();
+        refresh();
+    }
+
+    @Override
+    public void disable() {
+        available = false;
+        fromViewMethod = null;
+    }
+
+    @Override
+    public void refresh() {
+        Plugin plugin = Bukkit.getPluginManager().getPlugin(PLUGIN_NAME);
+        available = plugin != null && plugin.isEnabled();
+        if (available) {
+            initReflection();
+        } else {
+            fromViewMethod = null;
+        }
     }
 
     private synchronized void initReflection() {
@@ -46,7 +64,7 @@ public class AdvancedSpyInventoryHookImpl implements AdvancedSpyInventoryHook {
             this.hookedClassLoader = loader;
             if (!loggedHook) {
                 loggedHook = true;
-                clre20.itemLock.util.Log.hook("已成功動態掛接 <white>AdvancedSpyInventory</white> 插件！");
+                clre20.itemLock.util.Log.console("console.hooked", "plugin", PLUGIN_NAME);
             }
         } catch (Throwable ignored) {
             this.fromViewMethod = null;
@@ -55,23 +73,17 @@ public class AdvancedSpyInventoryHookImpl implements AdvancedSpyInventoryHook {
 
     @Override
     public boolean isAvailable() {
-        Plugin plugin = Bukkit.getPluginManager().getPlugin(PLUGIN_NAME);
-        return plugin != null && plugin.isEnabled();
+        return available;
     }
 
     @Override
     public SpyType getSpyType(InventoryView view) {
-        if (view == null || !isAvailable()) {
+        if (!available || view == null || !view.getClass().getName().startsWith(BASE_PACKAGE)) {
             return SpyType.NONE;
         }
-
-        // 快速初篩：AdvancedSpyInventory 的介面皆為自訂 InventoryView 類別
-        if (!view.getClass().getName().startsWith(BASE_PACKAGE)) {
-            return SpyType.NONE;
+        if (fromViewMethod == null) {
+            initReflection();
         }
-
-        // 若尚未就緒或外掛已重載，嘗試重新初始化
-        initReflection();
         if (fromViewMethod == null) {
             return SpyType.NONE;
         }

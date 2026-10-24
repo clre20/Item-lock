@@ -1,0 +1,122 @@
+# Item-lock 訊息
+# 支援 MiniMessage（<red>）或 & 顏色碼（&c）；{xxx} 為變數。
+messages-version: 1
+
+prefix: "<gold>[Item-Lock]</gold> "
+
+command:
+  no-permission: "<red>沒有權限。"
+  player-only: "<red>只能在遊戲內使用。"
+  unknown: "<red>未知指令，輸入 /{label} help 查看。"
+  usage: "<red>用法：{usage}"
+  help-header: "<gold>Item-Lock v{version}"
+  help-line: "<yellow>{usage} <gray>- {desc}"
+  help:
+    help: "指令說明"
+    gui: "開啟樣本列表"
+    list: "列出樣本"
+    edit: "編輯樣本設定"
+    add: "把主手物品設為樣本（-f 覆蓋）"
+    remove: "刪除樣本"
+    check: "檢查主手物品"
+    reload: "重新載入"
+    version: "檢查更新"
+  reload: "<green>已重新載入，共 {count} 個樣本。"
+  add-success: "<green>已新增樣本 <gold>{id}</gold>。"
+  add-overwrite: "<green>已覆蓋樣本 <gold>{id}</gold>。"
+  add-exists: "<red>樣本 {id} 已存在，加上 -f 覆蓋。"
+  hand-empty: "<red>主手沒有物品。"
+  invalid-id: "<red>名稱只能用英數字、_、-，最多 32 字。"
+  save-failed: "<red>儲存失敗，請看後台。"
+  remove-success: "<green>已刪除樣本 <gold>{id}</gold>。"
+  not-found: "<red>找不到樣本 {id}。"
+  check-protected: "<green>受保護，樣本：<gold>{id}</gold>"
+  check-not-protected: "<yellow>不受保護。"
+  list-header: "<gold>樣本（{count}）"
+  list-item: "<yellow>- {id} <gray>{material}"
+  list-empty: "<gray>沒有樣本。"
+
+deny:
+  default: "<red>受保護物品，無法在這裡使用。"
+  offhand: "<red>受保護物品，不能放副手。"
+  block-place: "<red>受保護物品，不能放置。"
+
+update:
+  checking: "<gray>檢查更新中…"
+  new: "<yellow>有新版本 <green>{latest}</green>（目前 {current}）<gray>{url}"
+  latest: "<green>已是最新版本（{current}）。"
+  dev: "<aqua>目前版本 {current} 比 GitHub 的 {latest} 新（開發版）。"
+  none: "<gray>GitHub 尚無發布版本（目前 {current}）。"
+  failed: "<red>檢查更新失敗。"
+  join: "<yellow>Item-Lock 有新版本 <green>{latest}</green>（目前 {current}），輸入 /itemlock version 查看。"
+
+gui:
+  value-on: "<green>開"
+  value-off: "<red>關"
+  prev: "<yellow>上一頁"
+  next: "<yellow>下一頁"
+  list:
+    title: "保護樣本 {page}/{pages}"
+    info-name: "<gold>共 {count} 個樣本"
+    info-lore:
+      - "<gray>左鍵點樣本進入設定"
+    item-lore:
+      - ""
+      - "<gray>ID：<gold>{id}"
+      - "<gray>副手 {offhand} <gray>放置 {place} <gray>丟出 {drop} <gray>漏斗 {hopper}"
+      - "<green>左鍵：設定"
+  settings:
+    title: "設定：{id}"
+    sample-lore:
+      - ""
+      - "<gray>ID：<gold>{id}"
+      - "<gray>建立：{created}"
+      - "<green>左鍵：取得一個複製品"
+    state-inherit: "<gray>狀態：<yellow>跟隨全域<gray>（{value}<gray>）"
+    state-on: "<gray>狀態：<green>強制開"
+    state-off: "<gray>狀態：<red>強制關"
+    toggle-hint: "<green>左鍵：跟隨全域 → 開 → 關"
+    back: "<yellow>返回列表"
+    delete: "<red>刪除樣本"
+    delete-lore:
+      - "<gray>左鍵點兩下確認"
+    delete-confirm: "<dark_red>再點一次確認刪除"
+    copy-given: "<green>已給予 {id} 複製品。"
+    deny-drop:
+      name: "<gold>禁止丟出"
+      lore:
+        - "<gray>不能按 Q 或拖出介面丟掉"
+    deny-offhand:
+      name: "<gold>禁止副手"
+      lore:
+        - "<gray>不能換到副手"
+    deny-block-place:
+      name: "<gold>禁止放置"
+      lore:
+        - "<gray>不能當方塊放到世界上"
+    deny-altar-interact:
+      name: "<gold>禁止右鍵機器"
+      lore:
+        - "<gray>不能手持右鍵附魔台、祭壇等"
+    deny-entity-interact:
+      name: "<gold>禁止展示框/盔甲架"
+      lore:
+        - "<gray>不能放進展示框或盔甲架"
+    allow-hopper-move:
+      name: "<gold>允許漏斗搬運"
+      lore:
+        - "<gray>漏斗可以從容器搬走"
+    allow-hopper-pickup:
+      name: "<gold>允許漏斗吸取"
+      lore:
+        - "<gray>漏斗可以吸走地上的掉落物"
+
+console:
+  enabled: "<green>已啟用 v{version}，載入 {count} 個樣本。"
+  disabled: "<gray>已停用。"
+  hooked: "<green>已連接 {plugin}。"
+  template-load-failed: "<red>樣本 {file} 載入失敗：{reason}"
+  template-invalid-name: "<yellow>略過檔名不合法的樣本：{file}"
+  template-too-large: "<yellow>略過過大的樣本檔：{file}"
+  template-write-failed: "<red>樣本 {id} 寫入失敗：{reason}"
+  invalid-sound: "<yellow>找不到音效 {sound}，改用預設。"

@@ -1,19 +1,52 @@
 name: Item-lock
-description: 高安全性物品保護與防修改系統
+description: 保護指定物品不被加工、修改或遺失
 version: '${version}'
 main: clre20.itemLock.ItemLock
 api-version: '1.21'
 load: POSTWORLD
 authors: [ Clre20 ]
+website: https://github.com/clre20/Item-lock
 softdepend: [ Shopkeepers, eShulkerBox, AdvancedSpyInventory ]
 
 commands:
   itemlock:
-    description: Item-lock 主管理指令
-    permission: itemlock.admin
-    usage: /itemlock [help|add|remove|check|list|gui|edit|reload]
+    description: Item-lock 指令
+    usage: /itemlock help
 
 permissions:
-  itemlock.admin:
-    description: 允許使用 Item-lock 所有管理指令 (OP Level 2)
+  itemlock.help:
+    description: /itemlock help
     default: op
+  itemlock.list:
+    description: /itemlock gui、/itemlock list
+    default: op
+  itemlock.edit:
+    description: /itemlock edit、介面中修改設定與取得複製品
+    default: op
+  itemlock.add:
+    description: /itemlock add
+    default: op
+  itemlock.remove:
+    description: /itemlock remove、介面中刪除樣本
+    default: op
+  itemlock.check:
+    description: /itemlock check
+    default: op
+  itemlock.reload:
+    description: /itemlock reload
+    default: op
+  itemlock.version:
+    description: /itemlock version 與登入時的新版本提醒
+    default: op
+  itemlock.admin:
+    description: 全部權限
+    default: op
+    children:
+      itemlock.help: true
+      itemlock.list: true
+      itemlock.edit: true
+      itemlock.add: true
+      itemlock.remove: true
+      itemlock.check: true
+      itemlock.reload: true
+      itemlock.version: true

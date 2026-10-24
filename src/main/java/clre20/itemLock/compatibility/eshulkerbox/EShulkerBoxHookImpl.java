@@ -21,9 +21,29 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
     private Method isReadOnlyMethod;
     private boolean reflectionReady = false;
     private boolean loggedHook = false;
+    private volatile boolean available;
 
     public EShulkerBoxHookImpl() {
-        initReflection();
+        refresh();
+    }
+
+    @Override
+    public void disable() {
+        available = false;
+        reflectionReady = false;
+        shulkerBoxMechanic = null;
+    }
+
+    @Override
+    public void refresh() {
+        Plugin plugin = Bukkit.getPluginManager().getPlugin("eShulkerBox");
+        available = plugin != null && plugin.isEnabled();
+        if (available) {
+            initReflection();
+        } else {
+            reflectionReady = false;
+            shulkerBoxMechanic = null;
+        }
     }
 
     private synchronized void initReflection() {
@@ -50,7 +70,7 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
                 this.reflectionReady = true;
                 if (!loggedHook) {
                     loggedHook = true;
-                    clre20.itemLock.util.Log.hook("已成功動態掛接 <white>eShulkerBox</white> 插件！");
+                    clre20.itemLock.util.Log.console("console.hooked", "plugin", "eShulkerBox");
                 }
             }
         } catch (Throwable ignored) {
@@ -60,13 +80,12 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
 
     @Override
     public boolean isAvailable() {
-        Plugin plugin = Bukkit.getPluginManager().getPlugin("eShulkerBox");
-        return plugin != null && plugin.isEnabled();
+        return available;
     }
 
     @Override
     public boolean isEShulkerBoxOpen(Player player, Inventory topInventory) {
-        if (!isAvailable() || player == null || topInventory == null) {
+        if (!available || player == null || topInventory == null) {
             return false;
         }
 
@@ -76,7 +95,7 @@ public class EShulkerBoxHookImpl implements EShulkerBoxHook {
         }
 
         // eShulkerBox 手持/隨身開啟的介面非世界方塊實體 (holder 非 BlockState 且 location == null)
-        if (topInventory.getHolder() instanceof org.bukkit.block.BlockState || topInventory.getLocation() != null) {
+        if (topInventory.getHolder(false) instanceof org.bukkit.block.BlockState || topInventory.getLocation() != null) {
             return false;
         }
 

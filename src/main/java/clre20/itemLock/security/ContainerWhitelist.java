@@ -4,6 +4,7 @@ import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.block.Chest;
 import org.bukkit.block.DoubleChest;
 import org.bukkit.block.ShulkerBox;
@@ -12,129 +13,72 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
 /**
- * 零信任容器安全白名單。
- * 僅允許純存儲容器：
- * - 單箱 / 雙箱 / 陷阱箱 (Chest / DoubleChest)
- * - 木桶 (Barrel)
- * - 潛影盒 (Shulker Box)
- * - 末影箱 (Ender Chest)
- * - 玩家自身背包 (PlayerInventory)
+ * 純儲存容器白名單：箱子／陷阱箱／大箱子、木桶、潛影盒（方塊）、末影箱、玩家背包。
+ * <p>
+ * 取 holder 一律用 {@code getHolder(false)}，不建立方塊快照；而且先看介面類型，只有需要時才取 holder。
  */
 public final class ContainerWhitelist {
 
     private ContainerWhitelist() {}
 
-    /**
-     * 檢查指定庫存是否為純存儲白名單容器（預設僅允許真實世界方塊實體或原生背包）。
-     */
     public static boolean isPureStorage(Inventory inventory) {
         return isPureStorage(inventory, false);
     }
 
-    /**
-     * 檢查指定庫存是否為純存儲白名單容器。
-     *
-     * @param inventory 要檢測的庫存介面
-     * @param allowVirtualShulkerBox 是否允許無方塊實體的虛擬/隨身潛影盒
-     * @return 若為允許的純存儲容器則回傳 true
-     */
     public static boolean isPureStorage(Inventory inventory, boolean allowVirtualShulkerBox) {
         if (inventory == null) {
             return false;
         }
-
         InventoryType type = inventory.getType();
-        InventoryHolder holder = inventory.getHolder();
-
-        // 玩家自身背包
-        if (type == InventoryType.PLAYER) {
-            return true;
-        }
-
-        // 末影箱
-        if (type == InventoryType.ENDER_CHEST) {
-            return true;
-        }
-
-        // 箱子、陷阱箱、雙箱（需為真實世界方塊，徹底防杜第三方插件虛擬 GUI / 自定義強化台）
-        if (type == InventoryType.CHEST) {
-            return holder instanceof Chest || holder instanceof DoubleChest;
-        }
-
-        // 木桶
-        if (type == InventoryType.BARREL) {
-            return holder instanceof Barrel;
-        }
-
-        // 潛影盒
-        if (type == InventoryType.SHULKER_BOX) {
-            if (holder instanceof ShulkerBox) {
+        switch (type) {
+            case PLAYER, ENDER_CHEST -> {
                 return true;
             }
-            if (allowVirtualShulkerBox && isVirtualShulkerBox(inventory)) {
-                return true;
+            case CHEST -> {
+                InventoryHolder holder = inventory.getHolder(false);
+                return holder instanceof Chest || holder instanceof DoubleChest;
             }
-            return false;
+            case BARREL -> {
+                return inventory.getHolder(false) instanceof Barrel;
+            }
+            case SHULKER_BOX -> {
+                InventoryHolder holder = inventory.getHolder(false);
+                if (holder instanceof ShulkerBox) {
+                    return true;
+                }
+                return allowVirtualShulkerBox && !(holder instanceof BlockState) && inventory.getLocation() == null;
+            }
+            default -> {
+                return false;
+            }
         }
-
-        return false;
     }
 
-    /**
-     * 檢查指定庫存是否為無方塊實體的虛擬潛影盒（例如手持/隨身開啟的潛影盒）。
-     */
+    /** 沒有方塊的潛影盒介面（手持／隨身開啟）。 */
     public static boolean isVirtualShulkerBox(Inventory inventory) {
-        if (inventory == null) {
-            return false;
-        }
-        return inventory.getType() == InventoryType.SHULKER_BOX
-                && !(inventory.getHolder() instanceof org.bukkit.block.BlockState)
+        return inventory != null
+                && inventory.getType() == InventoryType.SHULKER_BOX
+                && !(inventory.getHolder(false) instanceof BlockState)
                 && inventory.getLocation() == null;
     }
 
-    /**
-     * 檢查指定方塊是否為純存儲容器方塊（用於手持受保護物品右鍵世界方塊交互檢測）。
-     */
+    /** 右鍵世界方塊時，是否為純儲存容器方塊。 */
     public static boolean isPureStorageBlock(Block block) {
         if (block == null) {
             return false;
         }
-
-        Material material = block.getType();
-
-        // 箱子與陷阱箱
-        if (material == Material.CHEST || material == Material.TRAPPED_CHEST) {
-            return true;
-        }
-
-        // 木桶
-        if (material == Material.BARREL) {
-            return true;
-        }
-
-        // 末影箱
-        if (material == Material.ENDER_CHEST) {
-            return true;
-        }
-
-        // 所有顏色的潛影盒
-        return Tag.SHULKER_BOXES.isTagged(material);
+        Material m = block.getType();
+        return m == Material.CHEST || m == Material.TRAPPED_CHEST || m == Material.BARREL
+                || m == Material.ENDER_CHEST || Tag.SHULKER_BOXES.isTagged(m);
     }
 
-    /**
-     * 檢查指定方塊是否為單純開關類互動方塊（門、活板門、柵欄門、按鈕、拉桿）。
-     * 此類方塊右鍵僅切換開關狀態，不會消耗或轉化手持物品。
-     */
+    /** 門、活板門、柵欄門、按鈕、拉桿：右鍵只切換狀態。 */
     public static boolean isSimpleInteractableBlock(Block block) {
         if (block == null) {
             return false;
         }
-
-        Material material = block.getType();
-        return Tag.DOORS.isTagged(material)
-                || Tag.TRAPDOORS.isTagged(material)
-                || Tag.FENCE_GATES.isTagged(material)
-                || Tag.BUTTONS.isTagged(material)
-                || material == Material.LEVER;
+        Material m = block.getType();
+        return Tag.DOORS.isTagged(m) || Tag.TRAPDOORS.isTagged(m) || Tag.FENCE_GATES.isTagged(m)
+                || Tag.BUTTONS.isTagged(m) || m == Material.LEVER;
     }
 }

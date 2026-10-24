@@ -1,9 +1,13 @@
 package clre20.itemLock.listener;
 
+import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
 import clre20.itemLock.feedback.FeedbackService;
+import clre20.itemLock.feedback.FeedbackService.Deny;
 import clre20.itemLock.matcher.ItemMatcher;
+import clre20.itemLock.model.ItemTemplate;
 import clre20.itemLock.security.ContainerWhitelist;
+import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
@@ -22,190 +26,138 @@ import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.plugin.Plugin;
 
 /**
- * 實體與世界交互安全監聽器。
- * 包含右鍵非純容器方塊防轉化、展示框/盔甲架塞入防護、防丟棄及掉落物全免疫銷毀機制。
+ * 世界互動：右鍵機器方塊、展示框／盔甲架、丟出、掉落物免疫。
+ * 每個事件都先做最便宜的判斷（動作類型、實體類型），再比對物品。
  */
-public class WorldInteractionListener implements Listener {
+public final class WorldInteractionListener implements Listener {
 
-    private final org.bukkit.plugin.Plugin plugin;
+    private final Plugin plugin;
     private final PluginConfig config;
-    private final ItemMatcher itemMatcher;
-    private final FeedbackService feedbackService;
-    private final clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook shopkeepersHook;
+    private final ItemMatcher matcher;
+    private final FeedbackService feedback;
+    private final ShopkeepersHook shopkeepers;
 
-    public WorldInteractionListener(org.bukkit.plugin.Plugin plugin, PluginConfig config, ItemMatcher itemMatcher, FeedbackService feedbackService, clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook shopkeepersHook) {
+    public WorldInteractionListener(Plugin plugin, PluginConfig config, ItemMatcher matcher,
+                                    FeedbackService feedback, ShopkeepersHook shopkeepers) {
         this.plugin = plugin;
         this.config = config;
-        this.itemMatcher = itemMatcher;
-        this.feedbackService = feedbackService;
-        this.shopkeepersHook = shopkeepersHook;
+        this.matcher = matcher;
+        this.feedback = feedback;
+        this.shopkeepers = shopkeepers;
     }
 
-    /**
-     * 右鍵祭壇方塊安全：手持受保護物品右鍵非純容器方塊時取消交互，防止觸發多方塊機器轉化。
-     */
+    /** 手持受保護物品右鍵非儲存方塊（祭壇、附魔台、合成台等）時取消。 */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerInteractBlock(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }
-
-        ItemStack item = event.getItem();
-        if (!itemMatcher.isProtected(item)) {
+        ItemTemplate t = matcher.find(event.getItem());
+        if (t == null || !t.getSettings().isDenyAltarInteract(config)) {
             return;
         }
-
-        Block clickedBlock = event.getClickedBlock();
-        if (clickedBlock == null) {
+        Block block = event.getClickedBlock();
+        if (block == null) {
             return;
         }
-
-        // 若點擊的方塊為 Shopkeeper 方塊（例如告示牌商店），放行交互以開啟商店
-        if (shopkeepersHook.isAvailable() && shopkeepersHook.isShopkeeperBlock(clickedBlock)) {
+        if (shopkeepers.isAvailable() && shopkeepers.isShopkeeperBlock(block)) {
             return;
         }
-
-        if (itemMatcher.isDenyAltarInteract(item, config)) {
-            // 門、活板門、柵欄門、按鈕、拉桿：放行方塊開關互動，但禁止使用手持物品
-            // (防止受保護的方塊類物品藉由潛行右鍵被放置到這些方塊上)
-            if (ContainerWhitelist.isSimpleInteractableBlock(clickedBlock)) {
-                event.setUseItemInHand(Event.Result.DENY);
-                return;
-            }
-
-            // 若點擊的不是純存儲容器方塊（如祭壇、大鍋、合成台、附魔台、研磨石、鐵砧等）
-            if (!ContainerWhitelist.isPureStorageBlock(clickedBlock)) {
-                event.setCancelled(true);
-                feedbackService.sendDenyFeedback(event.getPlayer());
-                feedbackService.syncInventoryNextTick(event.getPlayer());
-            }
+        // 門、按鈕等：可以切換，但不使用手上的物品（避免潛行右鍵放置）
+        if (ContainerWhitelist.isSimpleInteractableBlock(block)) {
+            event.setUseItemInHand(Event.Result.DENY);
+            return;
+        }
+        if (!ContainerWhitelist.isPureStorageBlock(block)) {
+            event.setCancelled(true);
+            feedback.deny(event.getPlayer(), Deny.DEFAULT);
         }
     }
 
-    /**
-     * 實體交互安全：防止將受保護物品塞入物品展示框、發光展示框或盔甲架。
-     */
+    /** 不能放進展示框或穿到盔甲架上。 */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
-        Player player = event.getPlayer();
-        ItemStack mainHand = player.getInventory().getItemInMainHand();
-        ItemStack offHand = player.getInventory().getItemInOffHand();
-
-        boolean holdingProtected = itemMatcher.isDenyEntityInteract(mainHand, config) || itemMatcher.isDenyEntityInteract(offHand, config);
-        if (!holdingProtected) {
-            return;
-        }
-
         Entity target = event.getRightClicked();
-
-        // 若點擊的實體為 Shopkeeper（如盔甲架商店或村民商店），放行交互以開啟商店介面
-        if (shopkeepersHook.isAvailable() && shopkeepersHook.isShopkeeperEntity(target)) {
+        if (!(target instanceof ItemFrame) && !(target instanceof ArmorStand)) {
             return;
         }
-
-        if (target instanceof ItemFrame || target instanceof ArmorStand) {
-            event.setCancelled(true);
-            feedbackService.sendDenyFeedback(player);
-            feedbackService.syncInventoryNextTick(player);
+        Player player = event.getPlayer();
+        PlayerInventory inv = player.getInventory();
+        if (!denyEntity(inv.getItemInMainHand()) && !denyEntity(inv.getItemInOffHand())) {
+            return;
         }
+        if (shopkeepers.isAvailable() && shopkeepers.isShopkeeperEntity(target)) {
+            return;
+        }
+        event.setCancelled(true);
+        feedback.deny(player, Deny.DEFAULT);
     }
 
-    /**
-     * 防丟棄安全：若啟用 deny-drop，禁止玩家將受保護物品按 Q 丟出。
-     */
+    private boolean denyEntity(ItemStack item) {
+        ItemTemplate t = matcher.find(item);
+        return t != null && t.getSettings().isDenyEntityInteract(config);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerDropItem(PlayerDropItemEvent event) {
-        ItemStack dropped = event.getItemDrop().getItemStack();
-        if (itemMatcher.isDenyDrop(dropped, config)) {
+        ItemTemplate t = matcher.find(event.getItemDrop().getItemStack());
+        if (t != null && t.getSettings().isDenyDrop(config)) {
             event.setCancelled(true);
-            Player player = event.getPlayer();
-            feedbackService.sendDenyFeedback(player);
-            feedbackService.syncInventoryNextTick(player);
+            feedback.deny(event.getPlayer(), Deny.DEFAULT);
         }
     }
 
     /**
-     * 掉落實體生成防護：若允許丟出，實體生成時免疫火焰、熔岩、爆炸與異常實體銷毀。
-     * 自動偵測並清理原版 /give 或指令方塊產生的 1-Tick 動畫假物品 (makeFakeItem)，徹底杜絕地上殘留撿不起來的幽靈物品。
+     * 受保護的掉落物：無敵、生物不能撿。
+     * /give 產生的動畫假物品（撿不起來）下一 tick 移除，避免地上留下撿不起來的物品。
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onItemSpawn(ItemSpawnEvent event) {
-        Item itemEntity = event.getEntity();
-        if (itemMatcher.isProtected(itemEntity.getItemStack())) {
-            itemEntity.setInvulnerable(true);
-            itemEntity.setCanMobPickup(false);
-
-            // 排程於下一個 Tick 檢測是否為 /give 所產生的動畫假物品實體
-            org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                if (itemEntity.isValid()) {
-                    if (isFakeItem(itemEntity)) {
-                        // 動畫假物品在玩家獲得物品後應立即銷毀，不可留在地面
-                        itemEntity.remove();
-                    }
-                }
-            });
+        Item entity = event.getEntity();
+        if (matcher.find(entity.getItemStack()) == null) {
+            return;
         }
+        entity.setInvulnerable(true);
+        entity.setCanMobPickup(false);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (entity.isValid() && isFakeItem(entity)) {
+                entity.remove();
+            }
+        });
     }
 
-    /**
-     * 判定是否為原版 /give 指令產生的動畫假物品實體。
-     */
-    private boolean isFakeItem(Item item) {
-        // 原版 makeFakeItem 會將 pickupDelay 設為 Short.MAX_VALUE (32767) 且禁止撿拾，age 預設設為 5999
+    /** 原版 /give 動畫物品：pickupDelay 32767 且 age 5999。 */
+    private static boolean isFakeItem(Item item) {
         return !item.canPlayerPickup() || item.getPickupDelay() >= 32767 || item.getTicksLived() >= 5990;
     }
 
-    /**
-     * 實體受損免疫：防止掉落物受到爆炸、岩漿、虛空、仙人掌等傷害銷毀。
-     */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Item itemEntity) {
-            if (itemMatcher.isProtected(itemEntity.getItemStack())) {
-                event.setCancelled(true);
-            }
+        if (event.getEntity() instanceof Item item && matcher.find(item.getItemStack()) != null) {
+            event.setCancelled(true);
         }
     }
 
-    /**
-     * 實體燃燒免疫：防止掉落物因火焰燃燒銷毀。
-     */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityCombust(EntityCombustEvent event) {
-        if (event.getEntity() instanceof Item itemEntity) {
-            if (itemMatcher.isProtected(itemEntity.getItemStack())) {
-                event.setCancelled(true);
-            }
+        if (event.getEntity() instanceof Item item && matcher.find(item.getItemStack()) != null) {
+            event.setCancelled(true);
         }
     }
 
-    /**
-     * 掉落物自然消失免疫：
-     * 若為動畫假物品則放行銷毀；若為真實掉落物且開啟了 prevent-despawn 才取消消失。
-     */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onItemDespawn(ItemDespawnEvent event) {
-        Item itemEntity = event.getEntity();
-        if (itemMatcher.isProtected(itemEntity.getItemStack())) {
-            // 動畫假物品必須允許自然消失，不可被攔截
-            if (isFakeItem(itemEntity)) {
-                return;
-            }
-            if (config.isPreventDespawn()) {
-                event.setCancelled(true);
-            }
+        if (!config.isPreventDespawn()) {
+            return;
         }
-    }
-
-    /**
-     * 玩家離線時清理反饋冷卻快取。
-     */
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        feedbackService.clearCooldown(event.getPlayer().getUniqueId());
+        Item item = event.getEntity();
+        if (matcher.find(item.getItemStack()) != null && !isFakeItem(item)) {
+            event.setCancelled(true);
+        }
     }
 }

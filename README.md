@@ -1,125 +1,167 @@
 # Item-lock
 
+Item-lock 是 Paper 1.21+ 的物品保護插件。把任務道具、自訂裝備、代幣等物品登錄為「樣本」後，這些物品只能放在純儲存容器裡，無法被鐵砧、砂輪、熔爐、合成台或其他插件的介面加工、修改或吞掉。比對已針對效能最佳化：材質沒有樣本的物品只需一次查表，不讀取物品資料。
+
+## 功能特性
+
+- **樣本比對**：
+  * 依材質建立索引，大部分物品不需要任何比對
+  * 忽略耐久消耗與鐵砧修復成本，用過、修過的物品仍算同一個
+  * 已繪製地圖比對 map_id；其餘名稱、Lore、附魔、自訂模型、PDC 等全部要相同
+- **只能放在純儲存容器**：
+  * 箱子、陷阱箱、大箱子、木桶、潛影盒、末影箱、玩家背包
+  * 其他介面擋下點擊放入、Shift 移入、數字鍵交換、拖曳、雙擊收集
+- **箱子介面管理**：
+  * `/itemlock gui` 列出所有樣本，左鍵進入設定
+  * 每個樣本可個別設定 7 個開關（跟隨全域／強制開／強制關）
+  * 全部左鍵操作，刪除需點兩下確認
+- **世界互動防護**：
+  * 副手：擋 F 換手、`/geyser offhand`、副手槽；殘留時自動移回背包
+  * 禁止放置方塊、禁止右鍵機器方塊、禁止放進展示框或盔甲架
+  * 合成格內有受保護物品時清空產物（防地圖複製）
+  * 可選禁止丟出；掉落物免疫火焰、爆炸，生物不能撿
+- **漏斗**：
+  * 可分別設定漏斗搬運與吸取掉落物
+- **相容外掛**：
+  * Shopkeepers（交易與編輯介面）、eShulkerBox（手持潛影盒）
+  * AdvancedSpyInventory（/invsee、/enderchest）、Cmail（郵件附件）
+- **低資源用量**：
+  * 主執行緒只做必要判斷；寫檔在背景執行緒批次處理
+  * 版本檢查快取 10 分鐘，不輪詢
+- **設定與訊息**：
+  * 所有文字都在 `messages.yml`，支援 MiniMessage 與 & 顏色碼
+  * `config.yml`、`messages.yml` 啟動與重載時自動補齊缺少的項目
+
+## 指令與權限
+
+主指令為 `/itemlock`。
+
+| 指令 | 說明 | 執行者 | 權限節點 | 預設 |
+| :--- | :--- | :--- | :--- | :--- |
+| `/itemlock help` | 列出有權限的指令 | 遊戲內／後台 | `itemlock.help` | OP |
+| `/itemlock gui` | 開啟樣本列表介面 | 玩家 | `itemlock.list` | OP |
+| `/itemlock list` | 玩家開介面，後台顯示文字列表 | 遊戲內／後台 | `itemlock.list` | OP |
+| `/itemlock edit <名稱>` | 開啟樣本設定介面 | 玩家 | `itemlock.edit` | OP |
+| `/itemlock add <名稱> [-f]` | 把主手物品設為樣本（`-f` 覆蓋） | 玩家 | `itemlock.add` | OP |
+| `/itemlock remove <名稱>` | 刪除樣本 | 遊戲內／後台 | `itemlock.remove` | OP |
+| `/itemlock check` | 檢查主手物品是否受保護 | 玩家 | `itemlock.check` | OP |
+| `/itemlock reload` | 重新載入設定、訊息與樣本 | 遊戲內／後台 | `itemlock.reload` | OP |
+| `/itemlock version` | 檢查 GitHub 新版本 | 遊戲內／後台 | `itemlock.version` | OP |
+
+> - `itemlock.admin` 包含以上全部權限
+> - 有 `itemlock.version` 的玩家登入 3 秒後，若有新版本會收到提醒
+> - 名稱只能用英數字、`_`、`-`，最多 32 字
+
+## 使用範例
+
+### 1. 保護一把自訂武器
+1. 手持武器輸入：
+```bash
+/itemlock add dragon_sword
+```
+2. 之後這把武器（含磨損、修理過的）都不能放進鐵砧、砂輪等介面。
+
+### 2. 讓某個樣本禁止丟出
+1. 開啟設定：
+```bash
+/itemlock edit dragon_sword
+```
+2. 左鍵點「禁止丟出」，切換成「強制開」。
+3. 設定會在 10 秒內自動存檔（關服時也會存）。
+
+### 3. 關閉更新檢查
+在 `config.yml` 設定後執行 `/itemlock reload`：
+```bash
+update-checker:
+  check-on-startup: false
+  notify-on-join: false
+```
+
+## 設定檔
+
+`config.yml` 主要項目：
+
+| 項目 | 說明 |
+| :--- | :--- |
+| `deny-drop`、`deny-offhand`、`deny-block-place`、`deny-altar-interact`、`deny-entity-interact` | 全域防護開關（樣本可個別覆蓋） |
+| `hopper.allow-move`、`hopper.allow-pickup` | 漏斗搬運、吸取 |
+| `drop-protection.prevent-despawn` | 掉落物永不消失 |
+| `compatibility.*` | 各相容外掛的放行設定 |
+| `feedback.*` | 動作列提示、音效、冷卻 |
+| `gui.sounds` | 介面音效 |
+| `update-checker.check-on-startup`、`update-checker.notify-on-join` | 版本檢查 |
+
+所有訊息都在 `messages.yml`，變數格式為 `{名稱}`。
+
 ---
 
-Item-lock 是一款針對 Minecraft Paper 及 Purpur 伺服器端（1.21+）設計的物品保護插件。透過純存儲容器白名單與動態組件比對，防止伺服器特殊物品（如任務道具、自訂裝備、代幣貨幣）在未經授權的介面中遭到修改、附魔、加工、複製或意外丟失。
+# Item-lock
 
-### 主要功能
+Item-lock is an item protection plugin for Paper 1.21+. Register special items (quest items, custom gear, currency) as templates; they can then only be stored in pure storage containers and cannot be processed, modified, or consumed by anvils, grindstones, furnaces, crafting, or other plugins' menus. Matching is optimized: items whose material has no template cost a single table lookup.
 
-* **動態組件特徵比對**
-  * **材質過濾**：以物品材質進行快速初篩；針對已繪製地圖（`FILLED_MAP`）精準比對內部 `map_id`。
-  * **動態數值遮罩**：比對時自動屏蔽遊戲常態變動數值（將耐久消耗 `damage` 與鐵砧修復懲罰 `repair_cost` 歸零後再比對），確保物品磨損或維修後仍能正常匹配。
-  * **特徵指紋驗證**：比對 Custom Model Data、自訂名稱、Lore、附魔列表與 Persistent Data Container (PDC) 標籤。
+## Features
 
-* **純存儲容器白名單防護**
-  * 僅允許受保護物品存放在以下純儲存用途之容器：
-    * 箱子、雙箱、陷阱箱（限世界真實方塊實體）
-    * 木桶
-    * 潛影盒（已放置之方塊，或設定放行之虛擬潛影盒）
-    * 末影箱
-    * 玩家自身背包
-  * 當玩家開啟非白名單介面（如鐵砧、砂輪、鐵匠台、製圖台、熔爐，以及各類非純存儲的外掛自訂介面）時，攔截滑鼠放置、Shift 快速移入、數字鍵置換與滑鼠拖曳塗抹操作。
+- **Template matching**:
+  * Indexed by material — most items skip matching entirely
+  * Ignores durability damage and anvil repair cost
+  * Filled maps match by map_id; everything else (name, lore, enchantments, model data, PDC) must match
+- **Pure storage only**:
+  * Chests, trapped chests, double chests, barrels, shulker boxes, ender chests, player inventory
+  * Blocks click, shift-click, number-key swap, drag and double-click collect in other menus
+- **Chest GUI management**:
+  * `/itemlock gui` lists templates; left-click to edit
+  * 7 per-template toggles (inherit / force on / force off)
+  * Left-click only; delete requires two clicks
+- **World interaction**:
+  * Offhand guard (F key, `/geyser offhand`, offhand slot) with automatic return
+  * Block placement, machine right-click, item frame / armor stand guards
+  * Crafting output cleared when a protected item is in the grid
+  * Optional drop prevention; dropped items are immune to fire and explosions
+- **Hoppers**: separate settings for moving and picking up
+- **Compatibility**: Shopkeepers, eShulkerBox, AdvancedSpyInventory, Cmail
+- **Low resource use**: minimal main-thread work, batched background file writes, update result cached 10 minutes
+- **Config & messages**: all text in `messages.yml` (MiniMessage or & codes); missing keys auto-filled on start and reload
 
-* **遊戲內 GUI 管理系統 (v2.1+)**
-  * **樣本庫瀏覽介面 (`/itemlock gui` 或 `/itemlock list`)**：54 格分頁箱子介面，清楚陳列所有已註冊的保護物品、材質與個別防護開關摘要。
-  * **個別樣本設定介面 (`/itemlock edit <名稱>`)**：27 格箱子介面，管理員可自由針對單一物品調整各項防護開關（三態切換：繼承全域 / 強制開啟 / 強制關閉），並支援取得樣本副本或刪除樣本。
+## Commands & Permissions
 
-* **副手與世界互動安全**
-  * **副手防護**：攔截 F 換手、基岩版 `/geyser offhand` 指令與背包副手槽移入。若因未知途徑殘留於副手，系統將在切換手持或關閉介面時自動移回主背包。
-  * **方塊防放**：禁止玩家將受保護的方塊類物品作為方塊放置到世界上。
-  * **合成防拓印**：當 3x3 工作台或 2x2 隨身合成矩陣中包含受保護物品時，自動清空合成產物並取消事件，防止地圖複製或配方加工。
-  * **非容器方塊交互防護**：手持受保護物品右鍵非純存儲方塊（如祭壇、大鍋、附魔台）時取消交互。門、活板門、柵欄門、按鈕、拉桿等開關類方塊仍可正常互動，但不會使用手持物品（受保護的方塊類物品無法藉潛行右鍵放置）。
-  * **實體交互防護**：禁止將受保護物品放入展示框、發光展示框或裝備在盔甲架上。
-  * **丟棄防護**：可選開啟禁止按 Q 丟棄。掉落實體生成時自動賦予火焰、岩漿、爆炸傷害免疫，並禁止生物拾取。
+Main command: `/itemlock`.
 
-* **自動化物流管制**
-  * 支援獨立設定是否允許漏斗或漏斗礦車自容器中抽取並傳輸受保護物品，以及地面漏斗是否可吸取掉落的受保護物品。
+| Command | Description | Executor | Permission Node | Default |
+| :--- | :--- | :--- | :--- | :--- |
+| `/itemlock help` | List permitted commands | In-game / Console | `itemlock.help` | OP |
+| `/itemlock gui` | Open template list | Player only | `itemlock.list` | OP |
+| `/itemlock list` | GUI for players, text in console | In-game / Console | `itemlock.list` | OP |
+| `/itemlock edit <name>` | Open template settings | Player only | `itemlock.edit` | OP |
+| `/itemlock add <name> [-f]` | Register main-hand item (`-f` overwrites) | Player only | `itemlock.add` | OP |
+| `/itemlock remove <name>` | Delete a template | In-game / Console | `itemlock.remove` | OP |
+| `/itemlock check` | Check main-hand item | Player only | `itemlock.check` | OP |
+| `/itemlock reload` | Reload config, messages and templates | In-game / Console | `itemlock.reload` | OP |
+| `/itemlock version` | Check GitHub for updates | In-game / Console | `itemlock.version` | OP |
 
-* **第三方外掛相容支援**
-  * **Shopkeepers**：原生支援村民商店，允許受保護物品作為貨幣或商品交易，並支援在店主設定介面中進行配方配置。
-  * **eShulkerBox**：支援在手持或隨身開啟的潛影盒介面中安全存取受保護物品。
-  * **AdvancedSpyInventory**：支援在查看玩家背包（`/invsee`）與末影箱（`/enderchest`）介面中存取受保護物品；生物背包介面預設不放行，可於設定檔開啟。
-  * **Cmail**：支援在 Cmail 郵件介面中將受保護物品作為附件寄送與領取（需 Cmail 使用 `CmailHolder` 的版本）。
+> - `itemlock.admin` grants all of the above
+> - Players with `itemlock.version` are notified 3 seconds after joining when an update exists
+> - Names: letters, digits, `_`, `-`, up to 32 characters
 
-* **防幽靈物品與操作反饋**
-  * 攔截操作時於螢幕正下方顯示 Actionbar 提示並播放拒絕音效（具備冷卻防刷保護）。
-  * 攔截後於下 1 個 Tick 自動排程執行 `player.updateInventory()`，強制對齊伺服器與客戶端數據，消除幽靈物品。
+## Usage Examples
 
----
+### 1. Protect a custom weapon
+```bash
+/itemlock add dragon_sword
+```
 
-### 指令與權限說明
+### 2. Prevent dropping one template
+```bash
+/itemlock edit dragon_sword
+```
+Left-click "禁止丟出" until it shows force on. Saved within 10 seconds (and on shutdown).
 
-權限節點：`itemlock.admin`（預設為 OP Level 2）
+### 3. Disable update checks
+```bash
+update-checker:
+  check-on-startup: false
+  notify-on-join: false
+```
 
-| 指令語法 | 參數說明 | 功能說明 |
-| :--- | :--- | :--- |
-| `/itemlock help` | 無 | 顯示指令說明手冊。 |
-| `/itemlock gui` | 無 | 開啟 54 格保護物品樣本庫管理箱介面。 |
-| `/itemlock list` | 無 | 查看所有已註冊的保護樣本（玩家執行將自動開啟 GUI；主控台顯示文字列表）。 |
-| `/itemlock edit <名稱>` | 樣本名稱 | 開啟指定樣本的 27 格個別屬性設定介面。 |
-| `/itemlock add <名稱> [-f]` | 樣本名稱 (可選 `-f`) | 將主手手持物品註冊為保護樣本（耐久與修復懲罰自動正規化）。已存在時需加上 `-f` 強制覆蓋。 |
-| `/itemlock remove <名稱>` | 已存在的樣本名稱 | 自磁碟檔案與記憶體快取中刪除指定樣本。 |
-| `/itemlock check` | 無 | 檢測主手物品是否受保護，並顯示所匹配的樣本名稱。 |
-| `/itemlock reload` | 無 | 重新載入全域設定檔與所有樣本檔案至記憶體快取。 |
+## Configurable Message Keys
 
----
-
-## English
-
-Item-lock is an item protection plugin for Paper and Purpur Minecraft servers (1.21+). It protects designated items (such as unique quest items, RPG gear, or custom currency) from accidental loss, unauthorized modification, crafting, and grinding by restricting interactions to whitelisted storage containers.
-
-### Key Features
-
-* **Component-Aware Item Matching**
-  * **Material Filter**: Fast preliminary check by item material. Filled maps (`FILLED_MAP`) are matched by their internal `map_id`.
-  * **Dynamic Masking**: Normalizes gameplay wear components (resets `minecraft:damage` and anvil `minecraft:repair_cost` during comparison), ensuring used or repaired items remain protected.
-  * **Fingerprint Verification**: Compares Custom Model Data, display name, lore, enchantments, and Persistent Data Container (PDC) tags.
-
-* **Storage Whitelist Container Safety**
-  * Restricts protected item transfers strictly to pure storage blocks:
-    * Chests, Trapped Chests, and Double Chests (physical world blocks only)
-    * Barrels
-    * Shulker Boxes (placed physical blocks, or whitelisted virtual menus)
-    * Ender Chests
-    * Player Inventory
-  * Prevents depositing protected items into non-storage interfaces (such as anvils, grindstones, smithing tables, cartography tables, furnaces, or unauthorized custom plugin menus) via clicking, shift-clicking, hotbar number keys, or drag-painting.
-
-* **In-Game GUI Management (v2.1+)**
-  * **Template Browser (`/itemlock gui` or `/itemlock list`)**: A 54-slot paginated chest GUI displaying all registered templates, their materials, and active protection toggles.
-  * **Per-Item Settings (`/itemlock edit <id>`)**: A 27-slot chest GUI allowing administrators to adjust individual protection settings using tri-state toggles (Inherit Global / Enforce True / Enforce False), acquire a duplicate sample item, or safely delete a template.
-
-* **Offhand & World Interaction Safeguards**
-  * **Offhand Restriction**: Prevents moving protected items to the offhand slot via keybinds (F key), Bedrock `/geyser offhand` commands, or shift-clicking. Automatically returns residual offhand items to the main inventory.
-  * **Block Placement Guard**: Prevents players from placing protected block-type items into the physical world.
-  * **Crafting Protection**: Clears the output and cancels crafting if a protected item is placed inside a 3x3 crafting table or 2x2 player inventory grid (prevents vanilla map cloning and recipes).
-  * **Non-Storage Block Interaction**: Cancels right-click interactions on non-storage blocks (e.g. cauldrons, enchanting tables) while holding protected items. Doors, trapdoors, fence gates, buttons, and levers can still be toggled, but the held item is not used (protected block items cannot be sneak-placed onto them).
-  * **Entity Interaction**: Prevents inserting protected items into item frames, glowing item frames, or armor stands.
-  * **Drop Protection**: Optional toggle to prevent dropping via the Q key. Dropped entities receive immunity against fire, lava, explosions, and mob pickup.
-
-* **Logistics & Hoppers**
-  * Configurable controls for hoppers and hopper minecarts to allow or prevent transferring (`hopper.allow-move`) and picking up (`hopper.allow-pickup`) protected items.
-
-* **Third-Party Compatibility**
-  * **Shopkeepers**: Built-in support allowing protected items to be used as trading currency or items, and allowing configuration in the Shopkeepers editor menu.
-  * **eShulkerBox**: Allows storing and retrieving protected items within handheld or virtual shulker box interfaces.
-  * **AdvancedSpyInventory**: Allows moving protected items in the player inventory (`/invsee`) and ender chest (`/enderchest`) viewers. Entity inventory viewers are blocked by default and can be enabled in the config.
-  * **Cmail**: Allows sending and claiming protected items as mail attachments in Cmail GUIs (requires a Cmail build that uses `CmailHolder`).
-
-* **Player Feedback & Anti-Desync**
-  * Displays Actionbar notifications and plays refusal sounds when an illegal action is blocked.
-  * Automatically schedules `player.updateInventory()` on the next tick to prevent client-side ghost item desynchronization.
-
-### Commands & Permissions
-
-Permission Node: `itemlock.admin` (Default: OP Level 2)
-
-| Command | Arguments | Description |
-| :--- | :--- | :--- |
-| `/itemlock help` | None | Displays the command help menu. |
-| `/itemlock gui` | None | Opens the 54-slot template browser GUI. |
-| `/itemlock list` | None | Views all registered templates (opens GUI for players; prints text in console). |
-| `/itemlock edit <name>` | Template Name | Opens the 27-slot individual setting editor GUI for the specified template. |
-| `/itemlock add <name> [-f]` | Template Name (Optional `-f`) | Registers the item held in the main hand as a template. Durability and repair costs are automatically normalized. Use `-f` to overwrite. |
-| `/itemlock remove <name>` | Template Name | Removes a registered template from disk and memory. |
-| `/itemlock check` | None | Checks whether the item in the main hand is protected and displays its template ID. |
-| `/itemlock reload` | None | Reloads `config.yml` and all template YAML files into memory. |
+All messages live in `messages.yml` (`command.*`, `deny.*`, `update.*`, `gui.*`, `console.*`); placeholders use `{name}`.
