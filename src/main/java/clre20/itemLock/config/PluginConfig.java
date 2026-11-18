@@ -32,6 +32,7 @@ public final class PluginConfig {
     private boolean allowSpyEnderChest;
     private boolean allowSpyEntityInventory;
     private boolean allowCmail;
+    private boolean allowItemSkin;
 
     private boolean actionbarEnabled;
     private boolean soundEnabled;
@@ -70,6 +71,7 @@ public final class PluginConfig {
         allowSpyEnderChest = c.getBoolean("compatibility.advancedspyinventory.allow-ender-chest", true);
         allowSpyEntityInventory = c.getBoolean("compatibility.advancedspyinventory.allow-entity-inventory", false);
         allowCmail = c.getBoolean("compatibility.cmail.allow-mail", true);
+        allowItemSkin = c.getBoolean("compatibility.itemskin.allow-skin-editor", true);
 
         actionbarEnabled = c.getBoolean("feedback.actionbar.enabled", true);
         soundEnabled = c.getBoolean("feedback.sound.enabled", true);
@@ -136,6 +138,7 @@ public final class PluginConfig {
     public boolean isAllowSpyEnderChest() { return allowSpyEnderChest; }
     public boolean isAllowSpyEntityInventory() { return allowSpyEntityInventory; }
     public boolean isAllowCmail() { return allowCmail; }
+    public boolean isAllowItemSkin() { return allowItemSkin; }
     public boolean isActionbarEnabled() { return actionbarEnabled; }
     public boolean isSoundEnabled() { return soundEnabled; }
     public Sound getSound() { return sound; }

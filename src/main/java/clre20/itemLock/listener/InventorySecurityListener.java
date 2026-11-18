@@ -2,6 +2,7 @@ package clre20.itemLock.listener;
 
 import clre20.itemLock.compatibility.advancedspyinventory.AdvancedSpyInventoryHook;
 import clre20.itemLock.compatibility.cmail.CmailCompat;
+import clre20.itemLock.compatibility.itemskin.ItemSkinCompat;
 import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import clre20.itemLock.config.PluginConfig;
@@ -226,6 +227,9 @@ public final class InventorySecurityListener implements Listener {
             }
         }
         if (config.isAllowEShulkerBox() && eShulkerBox.isEShulkerBoxOpen(player, top)) {
+            return true;
+        }
+        if (config.isAllowItemSkin() && ItemSkinCompat.isItemSkinInventory(top)) {
             return true;
         }
         return config.isAllowCmail() && CmailCompat.isCmailInventory(top);

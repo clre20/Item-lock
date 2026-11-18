@@ -8,6 +8,7 @@ Item-lock 是 Paper 1.21+ 的物品保護插件。把任務道具、自訂裝備
   * 依材質建立索引，大部分物品不需要任何比對
   * 忽略耐久消耗與鐵砧修復成本，用過、修過的物品仍算同一個
   * 已繪製地圖比對 map_id；其餘名稱、Lore、附魔、自訂模型、PDC 等全部要相同
+  * ItemSkin 套用的外觀與隱藏標籤不影響比對
 - **只能放在純儲存容器**：
   * 箱子、陷阱箱、大箱子、木桶、潛影盒、末影箱、玩家背包
   * 其他介面擋下點擊放入、Shift 移入、數字鍵交換、拖曳、雙擊收集
@@ -24,7 +25,7 @@ Item-lock 是 Paper 1.21+ 的物品保護插件。把任務道具、自訂裝備
   * 可分別設定漏斗搬運與吸取掉落物
 - **相容外掛**：
   * Shopkeepers（交易與編輯介面）、eShulkerBox（手持潛影盒）
-  * AdvancedSpyInventory（/invsee、/enderchest）、Cmail（郵件附件）
+  * AdvancedSpyInventory（/invsee、/enderchest）、Cmail（郵件附件）、ItemSkin（外觀編輯介面）
 - **低資源用量**：
   * 主執行緒只做必要判斷；寫檔在背景執行緒批次處理
   * 版本檢查快取 10 分鐘，不輪詢
@@ -105,6 +106,7 @@ Item-lock is an item protection plugin for Paper 1.21+. Register special items (
   * Indexed by material — most items skip matching entirely
   * Ignores durability damage and anvil repair cost
   * Filled maps match by map_id; everything else (name, lore, enchantments, model data, PDC) must match
+  * Skins and hidden tags applied by ItemSkin are ignored
 - **Pure storage only**:
   * Chests, trapped chests, double chests, barrels, shulker boxes, ender chests, player inventory
   * Blocks click, shift-click, number-key swap, drag and double-click collect in other menus
@@ -118,7 +120,7 @@ Item-lock is an item protection plugin for Paper 1.21+. Register special items (
   * Crafting output cleared when a protected item is in the grid
   * Optional drop prevention; dropped items are immune to fire and explosions
 - **Hoppers**: separate settings for moving and picking up
-- **Compatibility**: Shopkeepers, eShulkerBox, AdvancedSpyInventory, Cmail
+- **Compatibility**: Shopkeepers, eShulkerBox, AdvancedSpyInventory, Cmail, ItemSkin (skin editor)
 - **Low resource use**: minimal main-thread work, batched background file writes, update result cached 10 minutes
 - **Config & messages**: all text in `messages.yml` (MiniMessage or & codes); missing keys auto-filled on start and reload
 
