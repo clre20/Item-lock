@@ -46,6 +46,9 @@ compatibility:
   cmail:
     # 允許當作郵件附件
     allow-mail: true
+  itemskin:
+    # 允許放進 ItemSkin 的外觀編輯介面（只改外觀，比對時會忽略 ItemSkin 的外觀與標籤）
+    allow-skin-editor: true
 
 feedback:
   actionbar:

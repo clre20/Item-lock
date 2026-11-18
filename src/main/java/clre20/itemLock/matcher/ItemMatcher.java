@@ -3,11 +3,13 @@ package clre20.itemLock.matcher;
 import clre20.itemLock.model.ItemTemplate;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.inventory.meta.Repairable;
+import org.bukkit.persistence.PersistentDataContainer;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,10 +25,16 @@ import java.util.Objects;
  * 效能重點：樣本依材質建索引，材質沒有樣本的物品（絕大多數）只做一次 EnumMap 查詢就返回，
  * 不讀 ItemMeta、不建立任何物件。樣本本身預先正規化並記下名稱、Lore 等特徵，比對時不再複製樣本。
  * <p>
- * 比對規則（與舊版相同）：耐久消耗與修復成本不計；已繪製地圖比對 map_id；其餘所有組件需相同（不計數量）。
+ * 比對規則：耐久消耗與修復成本不計；ItemSkin 的外觀（itemskin: 命名空間的 item_model 與 PDC 標籤）不計；
+ * 已繪製地圖比對 map_id；其餘所有組件需相同（不計數量）。
  * 只在主執行緒使用。
  */
 public final class ItemMatcher {
+
+    /** ItemSkin 外掛使用的命名空間：外觀與隱藏標籤都不影響比對。 */
+    private static final String ITEMSKIN_NAMESPACE = "itemskin";
+    /** item_model 組件從 1.21.4 開始才有，舊版伺服器不呼叫。 */
+    private static final boolean ITEM_MODEL_API = hasMethod(ItemMeta.class, "hasItemModel");
 
     private volatile Map<Material, Entry[]> index = new EnumMap<>(Material.class);
 
@@ -97,7 +105,7 @@ public final class ItemMatcher {
     }
 
     /**
-     * 去掉耐久消耗與修復成本。沒有這兩項時直接回傳原物品，不複製。
+     * 去掉耐久消耗、修復成本與 ItemSkin 外觀。都沒有時直接回傳原物品，不複製。
      * meta 必須是 item.getItemMeta() 取得的副本（會被修改）。
      */
     private static ItemStack normalize(ItemStack item, ItemMeta meta) {
@@ -108,6 +116,9 @@ public final class ItemMatcher {
         }
         if (meta instanceof Repairable r && r.hasRepairCost()) {
             r.setRepairCost(0);
+            changed = true;
+        }
+        if (stripItemSkin(meta)) {
             changed = true;
         }
         if (!changed) {
@@ -130,6 +141,37 @@ public final class ItemMatcher {
             }
         }
         return copy;
+    }
+
+    /** 移除 ItemSkin 設定的 item_model（只限 itemskin: 命名空間）與 itemskin: 的 PDC 標籤。 */
+    private static boolean stripItemSkin(ItemMeta meta) {
+        boolean changed = false;
+        if (ITEM_MODEL_API && meta.hasItemModel()) {
+            NamespacedKey model = meta.getItemModel();
+            if (model != null && ITEMSKIN_NAMESPACE.equals(model.getNamespace())) {
+                meta.setItemModel(null);
+                changed = true;
+            }
+        }
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        if (!pdc.isEmpty()) {
+            for (NamespacedKey key : new ArrayList<>(pdc.getKeys())) {
+                if (ITEMSKIN_NAMESPACE.equals(key.getNamespace())) {
+                    pdc.remove(key);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    private static boolean hasMethod(Class<?> type, String name) {
+        try {
+            type.getMethod(name);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 
     private static final class Entry {
