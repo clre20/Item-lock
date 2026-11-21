@@ -47,8 +47,6 @@ public final class UpdateChecker {
     private final Messages messages;
     private final String current;
     private final String api;
-    private final ExecutorService executor;
-    private HttpClient client;
     private Result cached;
     private CompletableFuture<Result> inflight;
 
@@ -58,11 +56,6 @@ public final class UpdateChecker {
         this.current = plugin.getPluginMeta().getVersion();
         // 測試用：-Ditemlock.update-api=<網址>
         this.api = System.getProperty("itemlock.update-api", DEFAULT_API);
-        this.executor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "Item-lock-Update");
-            t.setDaemon(true);
-            return t;
-        });
     }
 
     public String getCurrent() {
@@ -80,7 +73,7 @@ public final class UpdateChecker {
         if (inflight != null) {
             return inflight;
         }
-        CompletableFuture<Result> f = CompletableFuture.supplyAsync(this::fetch, executor);
+        CompletableFuture<Result> f = CompletableFuture.supplyAsync(this::fetch);
         inflight = f;
         f.whenComplete((r, e) -> {
             synchronized (UpdateChecker.this) {
@@ -148,27 +141,25 @@ public final class UpdateChecker {
     private Result fetch() {
         long now = System.currentTimeMillis();
         try {
-            if (client == null) {
-                client = HttpClient.newBuilder()
-                        .connectTimeout(Duration.ofSeconds(5))
-                        .followRedirects(HttpClient.Redirect.NORMAL)
-                        .build();
-            }
-            HttpRequest req = HttpRequest.newBuilder(URI.create(api))
-                    .timeout(Duration.ofSeconds(10))
-                    .header("Accept", "application/vnd.github+json")
-                    .header("User-Agent", "Item-lock/" + current)
-                    .GET().build();
-            HttpResponse<InputStream> res = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
-            String body;
-            try (InputStream in = res.body()) {
-                body = new String(in.readNBytes(MAX_BODY), StandardCharsets.UTF_8);
-            }
-            if (res.statusCode() == 404) {
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) java.net.URI.create(api).toURL().openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(10000);
+            conn.setRequestProperty("Accept", "application/vnd.github+json");
+            conn.setRequestProperty("User-Agent", plugin.getName() + "/" + current);
+            int code = conn.getResponseCode();
+            if (code == 404) {
+                conn.disconnect();
                 return new Result(Status.NONE, null, null, now);
             }
-            if (res.statusCode() != 200) {
+            if (code != 200) {
+                conn.disconnect();
                 return new Result(Status.FAILED, null, null, now);
+            }
+            String body;
+            try (java.io.InputStream in = conn.getInputStream()) {
+                body = new String(in.readNBytes(MAX_BODY), java.nio.charset.StandardCharsets.UTF_8);
+            } finally {
+                conn.disconnect();
             }
             JsonObject json = JsonParser.parseString(body).getAsJsonObject();
             JsonElement tag = json.get("tag_name");
@@ -183,17 +174,10 @@ public final class UpdateChecker {
             return new Result(s, latest, url, now);
         } catch (IOException | RuntimeException e) {
             return new Result(Status.FAILED, null, null, now);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return new Result(Status.FAILED, null, null, now);
         }
     }
 
     public void shutdown() {
-        executor.shutdownNow();
-        HttpClient c = client;
-        if (c != null) {
-            c.shutdownNow();
-        }
+        // 無常駐線程，不需關閉
     }
 }
