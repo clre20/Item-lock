@@ -1,6 +1,9 @@
 # Item-lock
 
-Item-lock 是 Paper 1.21+ 的物品保護插件。把任務道具、自訂裝備、代幣等物品登錄為「樣本」後，這些物品只能放在純儲存容器裡，無法被鐵砧、砂輪、熔爐、合成台或其他插件的介面加工、修改或吞掉。比對已針對效能最佳化：材質沒有樣本的物品只需一次查表，不讀取物品資料。
+Item-lock 是 Paper 26.3 (標準穩定版) 1.21+ 的物品保護插件。把任務道具、自訂裝備、代幣等物品登錄為「樣本」後，這些物品只能放在純儲存容器裡，無法被鐵砧、砂輪、熔爐、合成台或其他插件的介面加工、修改或吞掉。比對已針對效能最佳化：材質沒有樣本的物品只需一次查表，不讀取物品資料。
+
+
+> **版本檢查提示**：若伺服器有安裝 [HttpHub](https://github.com/clre20/HttpHub)，本插件自動由 HttpHub 集中處理版本檢查與管理員登入通知，避免各插件自開連線與背景執行緒。
 
 ## 功能特性
 
@@ -98,7 +101,10 @@ update-checker:
 
 # Item-lock
 
-Item-lock is an item protection plugin for Paper 1.21+. Register special items (quest items, custom gear, currency) as templates; they can then only be stored in pure storage containers and cannot be processed, modified, or consumed by anvils, grindstones, furnaces, crafting, or other plugins' menus. Matching is optimized: items whose material has no template cost a single table lookup.
+
+> **Update Checker**: When [HttpHub](https://github.com/clre20/HttpHub) is installed, update checks and operator login alerts are handled centrally by HttpHub via virtual threads, preventing redundant background connections.
+
+Item-lock is an item protection plugin for Paper 26.3 (標準穩定版) 1.21+. Register special items (quest items, custom gear, currency) as templates; they can then only be stored in pure storage containers and cannot be processed, modified, or consumed by anvils, grindstones, furnaces, crafting, or other plugins' menus. Matching is optimized: items whose material has no template cost a single table lookup.
 
 ## Features
 

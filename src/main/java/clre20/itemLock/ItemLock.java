@@ -74,7 +74,11 @@ public final class ItemLock extends JavaPlugin {
 
         Log.console("console.enabled", "version", updateChecker.getCurrent(), "count", count);
         if (pluginConfig.isCheckOnStartup()) {
+            if (getServer().getPluginManager().isPluginEnabled("HttpHub") && clre20.httpHub.api.HttpHubAPI.isAvailable()) {
+            clre20.httpHub.api.HttpHubAPI.registerUpdateCheck(this, "clre20/Item-lock", getPluginMeta().getVersion(), "itemlock.version", null);
+        } else {
             updateChecker.logOnStartup();
+        }
         }
     }
 
