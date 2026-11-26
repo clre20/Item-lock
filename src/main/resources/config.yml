@@ -1,7 +1,7 @@
 # Item-lock 設定檔
 # 所有顯示文字都在 messages.yml。
 # 每個樣本可在 /itemlock gui 個別覆蓋下面的開關。
-config-version: 3
+config-version: 4
 
 # 禁止按 Q 丟出
 deny-drop: false
@@ -49,6 +49,22 @@ compatibility:
   itemskin:
     # 允許放進 ItemSkin 的外觀編輯介面（只改外觀，比對時會忽略 ItemSkin 的外觀與標籤）
     allow-skin-editor: true
+  custominvaudit:
+    # 允許從 CustomInvAudit（/ca）介面把受保護物品「取出」的介面白名單。
+    # 只放行取出（拿起、Shift 移到自己背包、數字鍵換到快捷欄），放入一律禁止。
+    # 可用值：
+    #   player-inventory          線上玩家背包（/ca inv）
+    #   offline-player-inventory  離線玩家背包
+    #   ender-chest               線上玩家終界箱（/ca ec）
+    #   offline-ender-chest       離線玩家終界箱
+    #   entity                    生物裝備與背包（/ca entity）
+    # 留空 [] 表示全部禁止。
+    take-out-whitelist:
+      - player-inventory
+      - offline-player-inventory
+      - ender-chest
+      - offline-ender-chest
+      - entity
 
 feedback:
   actionbar:

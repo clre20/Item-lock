@@ -28,7 +28,7 @@ Item-lock 是 Paper 26.3 (標準穩定版) 1.21+ 的物品保護插件。把任�
   * 可分別設定漏斗搬運與吸取掉落物
 - **相容外掛**：
   * Shopkeepers（交易與編輯介面）、eShulkerBox（手持潛影盒）
-  * AdvancedSpyInventory（/invsee、/enderchest）、Cmail（郵件附件）、ItemSkin（外觀編輯介面）
+  * AdvancedSpyInventory（/invsee、/enderchest）、Cmail（郵件附件）、ItemSkin（外觀編輯介面）、CustomInvAudit（/ca 介面可依白名單取出受保護物品）
 - **低資源用量**：
   * 主執行緒只做必要判斷；寫檔在背景執行緒批次處理
   * 版本檢查快取 10 分鐘，不輪詢
@@ -126,7 +126,7 @@ Item-lock is an item protection plugin for Paper 26.3 (標準穩定版) 1.21+. R
   * Crafting output cleared when a protected item is in the grid
   * Optional drop prevention; dropped items are immune to fire and explosions
 - **Hoppers**: separate settings for moving and picking up
-- **Compatibility**: Shopkeepers, eShulkerBox, AdvancedSpyInventory, Cmail, ItemSkin (skin editor)
+- **Compatibility**: Shopkeepers, eShulkerBox, AdvancedSpyInventory, Cmail, ItemSkin (skin editor), CustomInvAudit (whitelisted take-out from /ca GUIs)
 - **Low resource use**: minimal main-thread work, batched background file writes, update result cached 10 minutes
 - **Config & messages**: all text in `messages.yml` (MiniMessage or & codes); missing keys auto-filled on start and reload
 

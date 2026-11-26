@@ -1,6 +1,7 @@
 package clre20.itemLock.compatibility;
 
 import clre20.itemLock.compatibility.advancedspyinventory.AdvancedSpyInventoryHook;
+import clre20.itemLock.compatibility.custominvaudit.CustomInvAuditCompat;
 import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
 import org.bukkit.event.EventHandler;
@@ -35,6 +36,7 @@ public final class HookRefreshListener implements Listener {
             case "Shopkeepers" -> shopkeepers.disable();
             case "eShulkerBox" -> eShulkerBox.disable();
             case "AdvancedSpyInventory" -> spyInventory.disable();
+            case "CustomInvAudit" -> CustomInvAuditCompat.clearCache();
             default -> { }
         }
     }

@@ -112,6 +112,10 @@ public final class ItemLock extends JavaPlugin {
         if (bad != null) {
             Log.console("console.invalid-sound", "sound", bad);
         }
+        if (!pluginConfig.getInvalidCustomInvAuditGuis().isEmpty()) {
+            Log.console("console.invalid-custominvaudit-gui", "names",
+                    String.join(", ", pluginConfig.getInvalidCustomInvAuditGuis()));
+        }
     }
 
     public PluginConfig getPluginConfig() { return pluginConfig; }

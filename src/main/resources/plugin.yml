@@ -6,7 +6,7 @@ api-version: '1.21'
 load: POSTWORLD
 authors: [ Clre20 ]
 website: https://github.com/clre20/Item-lock
-softdepend: [ Shopkeepers, eShulkerBox, AdvancedSpyInventory, HttpHub ]
+softdepend: [ Shopkeepers, eShulkerBox, AdvancedSpyInventory, CustomInvAudit, HttpHub ]
 
 commands:
   itemlock:

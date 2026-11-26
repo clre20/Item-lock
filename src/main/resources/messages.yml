@@ -120,3 +120,4 @@ console:
   template-too-large: "<yellow>略過過大的樣本檔：{file}"
   template-write-failed: "<red>樣本 {id} 寫入失敗：{reason}"
   invalid-sound: "<yellow>找不到音效 {sound}，改用預設。"
+  invalid-custominvaudit-gui: "<yellow>compatibility.custominvaudit.take-out-whitelist 中有無法辨識的介面：{names}"

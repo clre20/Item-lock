@@ -2,6 +2,8 @@ package clre20.itemLock.listener;
 
 import clre20.itemLock.compatibility.advancedspyinventory.AdvancedSpyInventoryHook;
 import clre20.itemLock.compatibility.cmail.CmailCompat;
+import clre20.itemLock.compatibility.custominvaudit.CustomInvAuditCompat;
+import clre20.itemLock.compatibility.custominvaudit.CustomInvAuditCompat.AuditGui;
 import clre20.itemLock.compatibility.itemskin.ItemSkinCompat;
 import clre20.itemLock.compatibility.eshulkerbox.EShulkerBoxHook;
 import clre20.itemLock.compatibility.shopkeepers.ShopkeepersHook;
@@ -126,6 +128,9 @@ public final class InventorySecurityListener implements Listener {
             if (isPureStorage(player, view)) {
                 return;
             }
+            if (isCustomInvAuditTakeOut(event, top, tCursor, tCurrent, tHotbar, tOffhand)) {
+                return;
+            }
             if (tCursor != null) {
                 cancel(event, player, Deny.DEFAULT);
                 restoreIfCreative(player, cursor);
@@ -233,6 +238,32 @@ public final class InventorySecurityListener implements Listener {
             return true;
         }
         return config.isAllowCmail() && CmailCompat.isCmailInventory(top);
+    }
+
+    /**
+     * CustomInvAudit 白名單介面中，把受保護物品「取出」的操作放行；只要有受保護物品會被放進介面就不放行。
+     * <ul>
+     *   <li>游標、數字鍵對應的快捷欄、副手（F）上的物品都不能是受保護物品（那些會被放進介面）</li>
+     *   <li>動作只限拿起、Shift 移到自己背包、數字鍵／F 換出、與游標上的一般物品交換</li>
+     *   <li>在介面中按 Q 丟出則依樣本的「禁止丟出」設定</li>
+     * </ul>
+     */
+    private boolean isCustomInvAuditTakeOut(InventoryClickEvent event, Inventory top, ItemTemplate tCursor,
+                                            ItemTemplate tCurrent, ItemTemplate tHotbar, ItemTemplate tOffhand) {
+        if (!config.hasCustomInvAuditTakeOut() || tCurrent == null
+                || tCursor != null || tHotbar != null || tOffhand != null) {
+            return false;
+        }
+        AuditGui gui = CustomInvAuditCompat.getType(top);
+        if (gui == AuditGui.NONE || !config.isCustomInvAuditTakeOutAllowed(gui)) {
+            return false;
+        }
+        return switch (event.getAction()) {
+            case PICKUP_ALL, PICKUP_HALF, PICKUP_SOME, PICKUP_ONE,
+                 MOVE_TO_OTHER_INVENTORY, HOTBAR_SWAP, SWAP_WITH_CURSOR -> true;
+            case DROP_ALL_SLOT, DROP_ONE_SLOT -> !tCurrent.getSettings().isDenyDrop(config);
+            default -> false;
+        };
     }
 
     private boolean isShopkeepersAllowed(Player player, Inventory top) {

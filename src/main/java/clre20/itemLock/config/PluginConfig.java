@@ -4,9 +4,14 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.YamlConfiguration;
+import clre20.itemLock.compatibility.custominvaudit.CustomInvAuditCompat.AuditGui;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * config.yml 的值。每次讀取都先補齊缺少的項目；所有值都有預設，不會出現 null。
@@ -33,6 +38,8 @@ public final class PluginConfig {
     private boolean allowSpyEntityInventory;
     private boolean allowCmail;
     private boolean allowItemSkin;
+    private Set<AuditGui> customInvAuditTakeOut = EnumSet.noneOf(AuditGui.class);
+    private List<String> invalidCustomInvAuditGuis = List.of();
 
     private boolean actionbarEnabled;
     private boolean soundEnabled;
@@ -72,6 +79,18 @@ public final class PluginConfig {
         allowSpyEntityInventory = c.getBoolean("compatibility.advancedspyinventory.allow-entity-inventory", false);
         allowCmail = c.getBoolean("compatibility.cmail.allow-mail", true);
         allowItemSkin = c.getBoolean("compatibility.itemskin.allow-skin-editor", true);
+        Set<AuditGui> takeOut = EnumSet.noneOf(AuditGui.class);
+        List<String> invalid = new ArrayList<>();
+        for (String key : c.getStringList("compatibility.custominvaudit.take-out-whitelist")) {
+            AuditGui g = AuditGui.fromKey(key);
+            if (g == null) {
+                invalid.add(key);
+            } else {
+                takeOut.add(g);
+            }
+        }
+        customInvAuditTakeOut = takeOut;
+        invalidCustomInvAuditGuis = List.copyOf(invalid);
 
         actionbarEnabled = c.getBoolean("feedback.actionbar.enabled", true);
         soundEnabled = c.getBoolean("feedback.sound.enabled", true);
@@ -139,6 +158,11 @@ public final class PluginConfig {
     public boolean isAllowSpyEntityInventory() { return allowSpyEntityInventory; }
     public boolean isAllowCmail() { return allowCmail; }
     public boolean isAllowItemSkin() { return allowItemSkin; }
+    /** CustomInvAudit 中允許把受保護物品取出的介面種類。 */
+    public boolean isCustomInvAuditTakeOutAllowed(AuditGui gui) { return customInvAuditTakeOut.contains(gui); }
+    public boolean hasCustomInvAuditTakeOut() { return !customInvAuditTakeOut.isEmpty(); }
+    /** 白名單中無法辨識的名稱，由主類別輸出警告。 */
+    public List<String> getInvalidCustomInvAuditGuis() { return invalidCustomInvAuditGuis; }
     public boolean isActionbarEnabled() { return actionbarEnabled; }
     public boolean isSoundEnabled() { return soundEnabled; }
     public Sound getSound() { return sound; }
